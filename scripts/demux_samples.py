@@ -8,7 +8,7 @@ import os, sys, getopt, subprocess, glob
 # Pipeline: a QIIME combined seqs file by sample. Requires
 # local QIIME installation.
 #
-# Usage: demux_samples.py seqs.fa
+# Usage: demux_samples.py -1 read1.fastq -2 read2.fastq
 #
 # Author: Martin Bontrager
 ############################################################
@@ -29,8 +29,6 @@ def main():
             read1 = arg
         elif opt in ("-2", "--r2"):
             read2 = arg
-    print 'Read 1 file is "', read1
-    print 'Read 2 file is "', read2
     path1 = os.path.dirname(read1) + '/'
     path2 = os.path.dirname(read2) + '/'
     get_barcodes(read1, read2, path1, path2)
@@ -73,16 +71,6 @@ def trim_barcodes(read1, read2, path1, path2):
             path2 + 'R2_trimmed_seq.fastq')
     run(cmd)
 
-#for a in f:
-    #unzip_cmd = 'tar -zxvf ' + a + ' -C unzipped'
-    #print unzip_cmd
-    #p = subprocess.Popen(unzip_cmd , shell=True)
-    #p.communicate()
-
-#xmlfiles = glob.glob(path + "/unzipped/*block*")
-#xmlout = path + "/BLAST_results.xml"
-
-#subprocess.call(["rm", "-r", "unzipped/"])
 
 if __name__ == "__main__":
     main()
