@@ -1,0 +1,61 @@
+TagCleaner
+==========
+
+TagCleaner. For cleaner sequences. (http://tagcleaner.sourceforge.net)
+
+The TagCleaner tool can be used to automatically detect and efficiently remove tag sequences (e.g. WTA tags) from genomic and metagenomic datasets. Go to http://tagcleaner.sourceforge.net/ for access to a user-friendly web-interface, the documentation and the latest updates.TagCleaner will help you to preprocess your genomic or metagenomic sequence data in FASTA or FASTQ format.
+
+
+STANDALONE VERSION
+------------------
+
+The standalone version is a standalone perl script (tagcleaner.pl) that does not require any non-core perl modules for processing.
+
+The used core modules are:
+   Getopt::Long
+   Pod::Usage
+   File::Temp
+   File::Path
+   Cwd
+   Fcntl
+
+To run the standalone version, you can either use "perl tagcleaner.pl [options]" or rename the "tagcleaner.pl" into "tagcleaner", add the execution mode ("chmod +x tagcleaner") and use "tagcleaner [options]".
+
+
+WEB VERSION - SETUP
+-------------------
+
+1. Download the latest version
+
+2. Copy the files to your cgi-bin/ directory
+
+3. Use Firebug (http://getfirebug.com/) to find any other issues such as hard-coded links and change them according to your system setup
+
+
+WEB VERSION - DEPENDENCIES
+--------------------------
+
+The PERL scripts require these modules:
+
+   CGI
+   Fcntl
+   Data::Dumper
+   IO::Uncompress::AnyUncompress
+
+
+BUG REPORTS
+-----------
+
+If you find a bug please report it at http://groups.google.com/group/EdwardsLabTools/ so that we can make TagCleaner better.
+
+
+COPYRIGHT AND LICENSE
+---------------------
+
+Copyright (C) 2010-2013  Robert SCHMIEDER
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.

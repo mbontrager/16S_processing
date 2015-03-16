@@ -1,76 +1,95 @@
 #!/usr/bin/python
 
 import os, sys, getopt, subprocess, glob
+from parse_csv import csv_parse
 
 ############################################################
-# Demultiplex MiSeq Reads with internal barcode
+# Demultiplex 338F/806R 16S MiSeq Reads with internal barcode
 #
-# Pipeline: a QIIME combined seqs file by sample. Requires
-# local QIIME installation.
+# Input - Paired .fastq reads w/ internal barcodes and a 
+# barcode mapping file in .csv format. See README for details
 #
-# Usage: demux_samples.py -1 read1.fastq -2 read2.fastq
+# Usage: demux_samples.py -f forward.fastq -r reverse.fastq -c map.csv
 #
 # Author: Martin Bontrager
 ############################################################
 
 def main():
-    read1 = ''
-    read2 = ''
+    f338 = ''
+    r806 = ''
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"h1:2:",["r1=","r2="])
+        opts, args = getopt.getopt(sys.argv[1:],"hf:r:c:",["forward=","reverse=", "csvfile="])
     except getopt.GetoptError:
-        print('demux_samples.py -1 <read1.fastq> -2 <read2.fastq>')
+        print('demux_samples.py -1 <forward_read.fastq> -2 <reverse_read.fastq> -c <map.csv>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('demux_samples.py -1 <read1.fastq> -2 <read2.fastq>')
+            print('demux_samples.py -1 <forward_read.fastq> -2 <reverse_read.fastq> -c <map.csv>')
             sys.exit()
-        elif opt in ("-1", "--r1"):
-            read1 = arg
-        elif opt in ("-2", "--r2"):
-            read2 = arg
-    path1 = os.path.dirname(read1) + '/'
-    path2 = os.path.dirname(read2) + '/'
-    get_barcodes(read1, read2, path1, path2)
-    trim_barcodes(read1, read2, path1, path2)
+        elif opt in ("-f", "--forward"):
+            f338 = arg
+        elif opt in ("-r", "--reverse"):
+            r806 = arg
+        elif opt in ("-c", "--csvfile"):
+            csvfile = arg
     
+    path = os.path.dirname(f338) + '/'
+    csv_parse(csvfile, (path + 'barcodes.fil'), (path + 'samples.txt'))
+    subprocess.call(['mkdir', (path + 'demux')])
+    subprocess.call(['mkdir', (path + 'reports')])
+    subprocess.call(['mkdir', (path + 'reports/FLASH_histograms')])
+    subprocess.call(['mkdir', (path + 'overlapped')])
+    demux(f338, r806, path)
+    dpath = path + 'demux/'
+
+    for i in get_samples(path + 'samples.txt'):
+        trim_barcodes((dpath + i + '_338F.fastq'), (dpath + i + '_806R.fastq'))
+        overlap(i, (dpath + i + '_338F_bctrimmed.fastq'), (dpath + i + '_806R_bctrimmed.fastq'))
+    p = subprocess.Popen('mv ' + (path + 'overlapped/*.hist ') + 
+                         (path + 'reports/FLASH_histograms/'), shell=True)
+    p.communicate()
+    subprocess.Popen('rm ' + (path + 'overlapped/*.histogram'), shell=True)
+    p.communicate()
+
 # Simplify running bash commands
 def run(cmd):
     p = subprocess.Popen(cmd, shell=True)
     os.waitpid(p.pid, 0)
 
-# Get barcodes from both reads
-def get_barcodes(read1, read2, path1, path2):
-    cmd = ('../tools/fastx_trimmer -i ' + 
-            read1 + ' -f 1 - l 12 -Q 33 -o ' + path1 + 'R1_barcode.fq')
-    run(cmd)
-    cmd = ('../tools/fastx_trimmer -i ' + 
-            read2 + ' -f 1 - l 12 -Q 33 -o ' + path2 + 'R2_barcode.fq')
-    run(cmd)
-    cmd = ('cat ' + path1 + 'R1_barcode.fq | '
-            '../tools/MiSeq16S-master/fq_mergelines.pl >'
-             + path1 + 'R1_barcode_temp')
-    run(cmd)
-    cmd = ('cat ' + path2 + 'R2_barcode.fq | '
-            '../tools/MiSeq16S-master/fq_mergelines.pl >'
-            + path2 + 'R2_barcode_temp')
-    run(cmd)
-    cmd = ('paste ' + path1 + 'R1_barcode_temp ' + path2 + 'R2_barcode_temp |'
-           ' awk -F"\\t" '
-          """'{print $5"\\t"$2$6"\\t"$3"\\t"$4$8}' """
-          "| ../tools/MiSeq16S-master/fq_splitlines.pl > " +
-          path1 + "R1R2_barcode.fastq")
+# Demultiplex the samples
+def demux(forward, reverse, path):
+    cmd = ('../tools/fastq-multx -x -b -B ' + path + 'barcodes.fil ' + forward + ' ' + reverse + ' -o ' + 
+           path + 'demux/%_338F.fastq ' + path + 'demux/%_806R.fastq -m 1 > ' + path + 
+           'reports/demux_log.txt')
     run(cmd)
 
-# Trim barcodes from original sequence files
-def trim_barcodes(read1, read2, path1, path2):
-    cmd = ('../tools/seqtk/seqtk trimfq -b 12 ' + read1 + ' > ' + 
-            path1 + 'R1_trimmed_seq.fastq')
+# Trim 12bp barcodes from each sequence read
+def trim_barcodes(forward, reverse):
+    newfor = forward.replace('.fastq', '') + '_bctrimmed.fastq'
+    newrev = reverse.replace('.fastq', '') + '_bctrimmed.fastq'
+    cmd = ('../tools/seqtk/seqtk trimfq -b 12 ' + forward + ' > ' + newfor)
     run(cmd)
-    cmd = ('../tools/seqtk/seqtk trimfq -b 12 ' + read2 + ' > ' + 
-            path2 + 'R2_trimmed_seq.fastq')
+    subprocess.call(['rm', forward])
+    cmd = ('../tools/seqtk/seqtk trimfq -b 12 ' + reverse + ' > ' + newrev)
     run(cmd)
+    subprocess.call(['rm', reverse])
 
+# Get a list of samples from the 'samples.txt' file generated via csv_parse
+def get_samples(samples):
+    s = []
+    with open(samples) as f:
+        for l in f:
+            s.append(l.strip())
+    return s
 
-if __name__ == "__main__":
-    main()
+# Overlap reads using flash
+def overlap(sample, forward, reverse):
+    d = os.path.dirname(forward).replace('/demux', '/overlapped')
+    cmd = ('../tools/FLASH-1.2.8/flash ' + forward + ' ' +  reverse + 
+           ' -r 288 -f 429 -s 18 -d '+ d + ' -o ' + sample + ' > ' + 
+           d.replace('overlapped', 'reports/') + sample + '.flash.log')
+    run(cmd)    
+    
+
+if __name__ == '__main__':
+  main()

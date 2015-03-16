@@ -1,0 +1,62 @@
+-- Version history --
+
+Certain updates only apply to the web version, but they should be obvious to
+figure out since they are likely modification of the interface.
+
+tagcleaner-standalone-0.16:
+Support tag prediction in mixed-case sequences.
+
+tagcleaner-standalone-0.15:
+Fix warnings during tag prediction.
+
+tagcleaner-standalone-0.14:
+Fixed issue with line width parameter not being set. Fix warnings with
+defined statements.
+
+tagcleaner-standalone-0.13:
+Fixed issue that generated warnings when the trimmed sequence is zero-length.
+Modified filename check to prevent endless loop. Other minor fixes.
+
+tagcleaner-web-0.12 / tagcleaner-standalone-0.12:
+Added matrix "exact" to allow trimming of ambiguous bases without considering
+the ambiguity code.
+
+tagcleaner-web-0.11.1 / tagcleaner-standalone-0.11.1:
+Corrected typo in regex (missing \ before s*).
+
+tagcleaner-web-0.11 / tagcleaner-standalone-0.11:
+Added support for ambiguous characters in the input sequences (thanks to Dave
+Messina from Stockholm for the suggestion). Character matching can be set based
+on three predefined matrices (new option -matrix). Non-IUPAC characters for
+nucleic acids are mismatched by default.
+
+tagcleaner-web-0.10 / tagcleaner-standalone-0.10:
+Fixed issue in tag detection for unknown shifts. Added File::Path for legacy
+support.
+
+tagcleaner-web-0.9 / tagcleaner-standalone-0.9:
+First release of standalone version. Web version now uses standalone version in
+backend. Improved tag detection. New features for the splitting of concatenated
+fragments and tag repeats. Filter options are now limited as filtering should be
+performed using PRINSEQ tool after trimming. Web version now allows FASTQ input
+and output and the processing of larger input files.
+
+tagcleaner-web-0.8:
+Fixed issue with uninitialized qual variable causing silent errors. Fixed issue
+with "good"/"bad" in output selection. Fixed issue with undefined header line.
+
+tagcleaner-web-0.7:
+Fixed bug in tag detection when no shifts can be found. Fixed issue in parsing
+FASTQ files with no information in '+' header line.
+
+tagcleaner-web-0.6:
+Added new function to tag sequence detection interface: "Use as 3'-end". Added
+Javascript function to check for tag sequence length to restrict tag sequences
+to max 64 bp.
+
+tagcleaner-web-0.5:
+Fixed "substr outside of string" during detection of tag sequence repeats.
+
+tagcleaner-web-0.4:
+Fixed cross browser issues. Added new functions to tag sequence detection
+("Reset to prediction" and "Clear all").

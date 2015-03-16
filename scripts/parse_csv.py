@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
 import csv, os, sys, getopt, subprocess, glob
 
@@ -8,7 +8,7 @@ import csv, os, sys, getopt, subprocess, glob
 #
 # Specific to output from the Ravel lab MiSeq 16S pipe
 #
-# Usage: python3 parse_csv.py -i infile.csv -o outfile
+# Usage: python parse_csv.py -i infile.csv -o outfile
 #
 # Author: Martin Bontrager
 ############################################################
@@ -32,8 +32,9 @@ def main():
     csv_parse(csv_file, outfile)
 
 # Parse the .csv barcodes file
-def csv_parse(file, outfile):
+def csv_parse(file, outfile, samples):
     output = open(outfile, 'w')
+    samples = open(samples, 'w')
     output.write("# sample\tforward\treverse\tstyle\n")
     with open(file) as f:
         reader = csv.DictReader(f)
@@ -41,6 +42,8 @@ def csv_parse(file, outfile):
             outstring = (str(r['sample_name']) + '-' + str(r['row']) + str(r['well']) + '\t' 
                          + str(r['F_barcode']) + '-' + str(r['R_Barcode']) + '\tTruSeq DNA\n')
             output.write(outstring)
+            samples.write(str(r['sample_name']) + '-' + str(r['row']) + str(r['well']) + '\n')
     output.close()
+    samples.close()
 if __name__ == "__main__":
     main()
