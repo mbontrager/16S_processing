@@ -19,8 +19,8 @@ from parse_csv import csv_parse
 ############################################################
 
 def main():
-    f338 = ''
-    r806 = ''
+    forw = ''
+    rev = ''
     keep = False
 
     try:
@@ -35,37 +35,40 @@ def main():
         if opt == '-k':
             keep = True
         elif opt in ("-f", "--forward"):
-            f338 = arg
+            forw = arg
         elif opt in ("-r", "--reverse"):
-            r806 = arg
+            rev = arg
         elif opt in ("-c", "--csvfile"):
             csvfile = arg
     
-    path = os.path.dirname(f338) + '/'
+    path = os.path.dirname(forw) + '/'
     dpath = path + 'demux/'
     subprocess.call(['mkdir', (path + 'demux')])
     subprocess.call(['mkdir', (path + 'logs')])
     subprocess.call(['mkdir', (path + 'logs/FLASH_histograms')])
+    subprocess.call(['mkdir', (path + 'logs/overlap')])
     subprocess.call(['mkdir', (path + 'logs/primer_trimming')])
     subprocess.call(['mkdir', (path + 'overlapped')])
     subprocess.call(['mkdir', (path + 'trimmed')])
     subprocess.call(['mkdir', (path + 'quality_filtered')])
 
     csv_parse(csvfile, (path + 'barcodes.fil'), (path + 'samples.txt'))
-    demux(f338, r806, path)
+    demux(forw, rev, path)
 
     for i in get_samples(path + 'samples.txt'):
+        if check_files((path + 'demux/'), i, '_338F.fastq') == 0 :
+           continue        
         trim_barcodes((dpath + i + '_338F.fastq'), (dpath + i + '_806R.fastq'))
-        overlap(i, (dpath + i + '_338F_bctrimmed.fastq'), (dpath + i + '_806R_bctrimmed.fastq'))
-        if check_files((path + 'overlapped/'), i) == 0 :
-           continue
+        overlap_usearch(i, (dpath + i + '_338F_bctrimmed.fastq'), (dpath + i + '_806R_bctrimmed.fastq'))
+        if check_files((path + 'overlapped/'), i, '.extendedFrags.fastq') == 0 :
+           continue     
         trim_primers((path + 'overlapped/'), i)
-
-    p = subprocess.Popen('mv ' + (path + 'overlapped/*.hist ') + 
-                         (path + 'logs/FLASH_histograms/'), shell=True)
-    p.communicate()
-    subprocess.Popen('rm ' + (path + 'overlapped/*.histogram'), shell=True)
-    p.communicate()
+        qc((path + 'trimmed/'), i)
+    # p = subprocess.Popen('mv ' + (path + 'overlapped/*.hist ') + 
+    #                      (path + 'logs/FLASH_histograms/'), shell=True)
+    # p.communicate()
+    # subprocess.Popen('rm ' + (path + 'overlapped/*.histogram'), shell=True)
+    # p.communicate()
 
 # Simplify running bash commands
 def run(cmd):
@@ -99,13 +102,23 @@ def get_samples(samples):
     return s
 
 # Overlap reads using flash
-def overlap(sample, forward, reverse):
+def overlap_flash(sample, forward, reverse):
     d = os.path.dirname(forward).replace('/demux', '/overlapped')
     cmd = ('../tools/FLASH-1.2.8/flash ' + forward + ' ' +  reverse + 
            ' -r 288 -f 429 -s 18 -d '+ d + ' -o ' + sample + ' > ' + 
-           d.replace('overlapped', 'logs/') + sample + '.flash.log')
+           d.replace('overlapped', 'logs/') + sample + '.overlap.log')
+    run(cmd)
+
+# Overlap reads using usearch8 (preferred)
+def overlap_usearch(sample, forward, reverse):
+    d = os.path.dirname(forward).replace('/demux', '/overlapped/')
+    cmd = ('../tools/usearch8 -fastq_mergepairs ' + forward + ' -reverse ' + 
+           reverse + ' -fastq_minovlen 100 -fastqout '+ d + sample + 
+           '.extendedFrags.fastq -log '+ d.replace('/overlapped/', '/logs/overlap/') +
+           sample + '.overlap.log -quiet')
     run(cmd)    
 
+# Trim 338F/806R primers with tagcleaner
 def trim_primers(path, sample):
     cmd = ('../tools/tagcleaner-standalone-0.16/tagcleaner.pl -fastq ' + path + 
            sample + '.extendedFrags.fastq -out ' + path.replace('overlapped/', 'trimmed/') + 
@@ -114,9 +127,17 @@ def trim_primers(path, sample):
            ' -tag3 ATTAGAWACCCBDGTAGTCC -mm3 2')
     run(cmd)
 
-def check_files(path, f):
-    n = os.path.getsize(path + f + '.extendedFrags.fastq')
+# Check for empty files
+def check_files(path, f, tag):
+    n = os.path.getsize(path + f + tag)
     return n
+
+# Quality filter with usearch8 
+def qc(path, f):
+    cmd = ('../tools/usearch8 -fastq_filter ' + path + f + '.fastq ' + 
+           '-fastqout ' + path.replace('/trimmed/', '/quality_filtered/') + f +
+           '.fastq -fastq_maxee 6 -relabel ' + f + ' -eeout')
+    run(cmd)
 
 if __name__ == '__main__':
   main()
