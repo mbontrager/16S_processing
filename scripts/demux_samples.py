@@ -51,10 +51,12 @@ def main():
     subprocess.call(['mkdir', (path + 'overlapped')])
     subprocess.call(['mkdir', (path + 'trimmed')])
     subprocess.call(['mkdir', (path + 'quality_filtered')])
-
+    
+    change_names(csvfile)
+    csvfile = csvfile.replace('.csv', '_fixed.csv')
     csv_parse(csvfile, (path + 'barcodes.fil'), (path + 'samples.txt'))
     demux(forw, rev, path)
-
+    
     for i in get_samples(path + 'samples.txt'):
         if check_files((path + 'demux/'), i, '_338F.fastq') == 0 :
            continue        
@@ -64,6 +66,8 @@ def main():
            continue     
         trim_primers((path + 'overlapped/'), i)
         qc((path + 'trimmed/'), i)
+    
+    gen_makecontigs((path + 'quality_filtered'))
     # p = subprocess.Popen('mv ' + (path + 'overlapped/*.hist ') + 
     #                      (path + 'logs/FLASH_histograms/'), shell=True)
     # p.communicate()
@@ -74,6 +78,11 @@ def main():
 def run(cmd):
     p = subprocess.Popen(cmd, shell=True)
     p.communicate()
+
+# Change poor file names with external script (modify as needed)
+def change_names(csvfile):
+    cmd = ('python fix_sample_names.py -c ' + csvfile)
+    run(cmd)
 
 # Demultiplex the samples
 def demux(forward, reverse, path):
@@ -135,9 +144,22 @@ def check_files(path, f, tag):
 # Quality filter with usearch8 
 def qc(path, f):
     cmd = ('../tools/usearch8 -fastq_filter ' + path + f + '.fastq ' + 
-           '-fastqout ' + path.replace('/trimmed/', '/quality_filtered/') + f +
-           '.fastq -fastq_maxee 6 -relabel ' + f + ' -eeout')
+           '-fastaout ' + path.replace('/trimmed/', '/quality_filtered/') + f +
+           '.fasta -fastq_maxee 6 -relabel ' + f + ' -eeout -quiet')
     run(cmd)
+
+# Generate a make.contigs() mothur command with all samples
+def gen_makecontigs(path):
+    os.chdir(path)
+    files = glob.glob('*.fasta')
+    mothurcmd = 'make.groups(fasta='
+    for f in files:
+        mothurcmd = mothurcmd + f + '-'
+    mothurcmd = mothurcmd.rstrip('-') + ', groups='
+    for f in files:
+        mothurcmd = mothurcmd + f.replace('.fasta', '') + '-'
+    mothurcmd = mothurcmd.rstrip('-') + ')'
+    return mothurcmd
 
 if __name__ == '__main__':
   main()
