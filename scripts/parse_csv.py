@@ -39,10 +39,10 @@ def csv_parse(file, outfile, samples):
     with open(file) as f:
         reader = csv.DictReader(f)
         for r in reader:
-            outstring = (str(r['sample_name']) + '-' + str(r['row']) + str(r['well']) + '\t' 
+            outstring = (str(r['sample_name']) + '.' + str(r['row']) + str(r['well']) + '\t' 
                          + str(r['F_barcode']) + '-' + str(r['R_Barcode']) + '\tTruSeq DNA\n')
             output.write(outstring)
-            samples.write(str(r['sample_name']) + '-' + str(r['row']) + str(r['well']) + '\n')
+            samples.write(str(r['sample_name']) + '.' + str(r['row']) + str(r['well']) + '\n')
     output.close()
     samples.close()
 if __name__ == "__main__":

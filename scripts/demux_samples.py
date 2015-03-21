@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, getopt, subprocess, glob
+import os, sys, getopt, subprocess, glob, re
 from parse_csv import csv_parse
 
 ############################################################
@@ -22,9 +22,10 @@ def main():
     forw = ''
     rev = ''
     keep = False
+    proc = '1'
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:],"hkf:r:c:",["forward=","reverse=", "csvfile="])
+        opts, args = getopt.getopt(sys.argv[1:],"hkf:r:c:p:",["forward=","reverse=", "csvfile=", "processors="])
     except getopt.GetoptError:
         print('demux_samples.py -1 <forward_read.fastq> -2 <reverse_read.fastq> -c <map.csv>')
         sys.exit(2)
@@ -34,13 +35,15 @@ def main():
             sys.exit()
         if opt == '-k':
             keep = True
+        elif opt in ("-p", "--processors"):
+            proc = str(arg)
         elif opt in ("-f", "--forward"):
             forw = arg
         elif opt in ("-r", "--reverse"):
             rev = arg
         elif opt in ("-c", "--csvfile"):
             csvfile = arg
-    
+
     path = os.path.dirname(forw) + '/'
     dpath = path + 'demux/'
     subprocess.call(['mkdir', (path + 'demux')])
@@ -51,28 +54,35 @@ def main():
     subprocess.call(['mkdir', (path + 'overlapped')])
     subprocess.call(['mkdir', (path + 'trimmed')])
     subprocess.call(['mkdir', (path + 'quality_filtered')])
-    
+    subprocess.call(['mkdir', (path + 'mothur')])
+
     change_names(csvfile)
     csvfile = csvfile.replace('.csv', '_fixed.csv')
     csv_parse(csvfile, (path + 'barcodes.fil'), (path + 'samples.txt'))
     demux(forw, rev, path)
     
     for i in get_samples(path + 'samples.txt'):
-        if check_files((path + 'demux/'), i, '_338F.fastq') == 0 :
-           continue        
+        if check_files(dpath, i, '_338F.fastq') == 0:
+            continue        
         trim_barcodes((dpath + i + '_338F.fastq'), (dpath + i + '_806R.fastq'))
         overlap_usearch(i, (dpath + i + '_338F_bctrimmed.fastq'), (dpath + i + '_806R_bctrimmed.fastq'))
-        if check_files((path + 'overlapped/'), i, '.extendedFrags.fastq') == 0 :
-           continue     
-        trim_primers((path + 'overlapped/'), i)
-        qc((path + 'trimmed/'), i)
+    print('Overlap complete')
+    clean(keep, dpath)
     
-    gen_makecontigs((path + 'quality_filtered'))
-    # p = subprocess.Popen('mv ' + (path + 'overlapped/*.hist ') + 
-    #                      (path + 'logs/FLASH_histograms/'), shell=True)
-    # p.communicate()
-    # subprocess.Popen('rm ' + (path + 'overlapped/*.histogram'), shell=True)
-    # p.communicate()
+    for i in get_samples(path + 'samples.txt'):
+        if not os.path.isfile(path + 'overlapped/' + i + '.extendedFrags.fastq'):
+            continue     
+        elif check_files((path + 'overlapped/'), i, '.extendedFrags.fastq') == 0:
+            continue
+        trim_primers((path + 'overlapped/'), i)
+    print('Primers trimmed')
+    clean(keep, (path + 'overlapped/'))
+    
+    for i in glob.glob(path + 'trimmed/*.fastq'):
+        qc(i)
+    print('QC complete. WARNING errors generally indicate one or more empty samples')
+    clean(keep, (path + 'trimmed/'))
+    mothur(path, proc)
 
 # Simplify running bash commands
 def run(cmd):
@@ -110,7 +120,7 @@ def get_samples(samples):
             s.append(l.strip())
     return s
 
-# Overlap reads using flash
+# Overlap reads using flash (NOT USED)
 def overlap_flash(sample, forward, reverse):
     d = os.path.dirname(forward).replace('/demux', '/overlapped')
     cmd = ('../tools/FLASH-1.2.8/flash ' + forward + ' ' +  reverse + 
@@ -122,19 +132,19 @@ def overlap_flash(sample, forward, reverse):
 def overlap_usearch(sample, forward, reverse):
     d = os.path.dirname(forward).replace('/demux', '/overlapped/')
     cmd = ('../tools/usearch8 -fastq_mergepairs ' + forward + ' -reverse ' + 
-           reverse + ' -fastq_minovlen 100 -fastqout '+ d + sample + 
-           '.extendedFrags.fastq -log '+ d.replace('/overlapped/', '/logs/overlap/') +
-           sample + '.overlap.log -quiet')
-    run(cmd)    
+           reverse + ' -fastqout '+ d + sample + '.extendedFrags.fastq -log ' + 
+           d.replace('/overlapped/', '/logs/overlap/') + sample + '.overlap.log -quiet')
+    run(cmd)
 
 # Trim 338F/806R primers with tagcleaner
 def trim_primers(path, sample):
     cmd = ('../tools/tagcleaner-standalone-0.16/tagcleaner.pl -fastq ' + path + 
            sample + '.extendedFrags.fastq -out ' + path.replace('overlapped/', 'trimmed/') + 
-           sample + ' -log ' + path.replace('overlapped/','') + 'logs/primer_trimming/' + 
-           sample + '.primertrim.log -nomatch 3 -tag5 ACTCCTACGGGAGGCAGCAG -mm5 2' + 
+           sample + ' -nomatch 3 -tag5 ACTCCTACGGGAGGCAGCAG -mm5 2' + 
            ' -tag3 ATTAGAWACCCBDGTAGTCC -mm3 2')
-    run(cmd)
+    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    p.communicate()
+
 
 # Check for empty files
 def check_files(path, f, tag):
@@ -142,24 +152,60 @@ def check_files(path, f, tag):
     return n
 
 # Quality filter with usearch8 
-def qc(path, f):
-    cmd = ('../tools/usearch8 -fastq_filter ' + path + f + '.fastq ' + 
-           '-fastaout ' + path.replace('/trimmed/', '/quality_filtered/') + f +
-           '.fasta -fastq_maxee 6 -relabel ' + f + ' -eeout -quiet')
+def qc(f):
+    cmd = ('../tools/usearch8 -fastq_filter ' + f + 
+           ' -fastaout ' + f.replace('/trimmed/', '/quality_filtered/').replace('.fastq', '.fasta') + 
+           ' -fastq_maxee 6 -quiet')
     run(cmd)
 
 # Generate a make.contigs() mothur command with all samples
-def gen_makecontigs(path):
+def gen_makegroups(path):
     os.chdir(path)
-    files = glob.glob('*.fasta')
-    mothurcmd = 'make.groups(fasta='
+    full = glob.glob('*.fasta')
+    files = []
+    for f in full:
+        if os.path.getsize(path + '/' + f) == 0:
+            continue
+        else:
+            files.append(f)
+    
+    groupcmd = 'make.group(fasta='
+    mergecmd = 'merge.files(input='
     for f in files:
-        mothurcmd = mothurcmd + f + '-'
-    mothurcmd = mothurcmd.rstrip('-') + ', groups='
+        groupcmd = groupcmd + f + '-'
+        mergecmd = mergecmd + f + '-'
+    groupcmd = groupcmd.rstrip('-') + ', groups='
+    mergecmd = mergecmd.rstrip('-') + ', output=allsamples.fasta)\n'
     for f in files:
-        mothurcmd = mothurcmd + f.replace('.fasta', '') + '-'
-    mothurcmd = mothurcmd.rstrip('-') + ')'
+        groupcmd = groupcmd + f.replace('.fasta', '') + '-'
+    groupcmd = groupcmd.rstrip('-') + ')\n'
+    dircmd = ('set.dir(input=' + path + ', output=' + 
+              path.replace('quality_filtered', 'mothur') + ')\n')
+    mothurcmd = groupcmd + dircmd + mergecmd
     return mothurcmd
+
+# Generate initial mothur commands
+def mothur(path, p):
+    f = open('batch.mothur', 'r')
+    tmp = f.readlines()
+    f.close()
+    f = open((path + 'batch.mothur'), 'w')
+    for i, line in enumerate(tmp):
+        f.write(line)
+        if i == 0:
+            f.write('set.dir(input=' + path + 'quality_filtered)\n')
+            f.write(gen_makegroups(path + 'quality_filtered'))
+            f.write('set.dir(input=' + path + 'mothur, output='+ path + 'mothur)\n')
+            f.write('system(mv ' + path + 'quality_filtered/mergegroups ' + path + 'mothur)\n')
+            f.write('summary.seqs(fasta=allsamples.fasta, processors=' + p + ')\n')
+    f.close()
+
+# Clean up temp files from demultiplexing and trimming
+def clean(k, f):
+    if k is False:
+        subprocess.call(['rm', '-r', f])
+    else:
+        pass
 
 if __name__ == '__main__':
   main()
