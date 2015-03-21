@@ -1,0 +1,4 @@
+#Mothur batch file for 338F/806R
+screen.seqs(fasta=current, group=mergegroups, name=current, minlength=390, maxlength=450, summary=current)
+unique.seqs(fasta=current)
+count.seqs(name=current, group=current)
