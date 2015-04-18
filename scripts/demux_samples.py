@@ -23,15 +23,16 @@ def main():
     rev = ''
     keep = False
     proc = '1'
+    scriptdir = os.getcwd()
 
     try:
         opts, args = getopt.getopt(sys.argv[1:],"hkf:r:c:p:",["forward=","reverse=", "csvfile=", "processors="])
     except getopt.GetoptError:
-        print('demux_samples.py -1 <forward_read.fastq> -2 <reverse_read.fastq> -c <map.csv>')
+        print('demux_samples.py -f <forward_read.fastq> -r <reverse_read.fastq> -c <map.csv>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('demux_samples.py -1 <forward_read.fastq> -2 <reverse_read.fastq> -c <map.csv>')
+            print('demux_samples.py -f <forward_read.fastq> -r <reverse_read.fastq> -c <map.csv>')
             sys.exit()
         if opt == '-k':
             keep = True
@@ -82,7 +83,7 @@ def main():
         qc(i)
     print('QC complete. WARNING errors generally indicate one or more empty samples')
     clean(keep, (path + 'trimmed/'))
-    mothur(path, proc)
+    mothur(path, proc, scriptdir)
 
 # Simplify running bash commands
 def run(cmd):
@@ -179,13 +180,11 @@ def gen_makegroups(path):
     for f in files:
         groupcmd = groupcmd + f.replace('.fasta', '') + '-'
     groupcmd = groupcmd.rstrip('-') + ')\n'
-    dircmd = ('set.dir(input=' + path + ', output=' + 
-              path.replace('quality_filtered', 'mothur') + ')\n')
-    mothurcmd = groupcmd + dircmd + mergecmd
+    mothurcmd = groupcmd + mergecmd
     return mothurcmd
 
-# Generate initial mothur commands
-def mothur(path, p):
+# Generate initial mothur commands and run mothur batch file
+def mothur(path, p, s):
     f = open('batch.mothur', 'r')
     tmp = f.readlines()
     f.close()
@@ -199,6 +198,9 @@ def mothur(path, p):
             f.write('system(mv ' + path + 'quality_filtered/mergegroups ' + path + 'mothur)\n')
             f.write('summary.seqs(fasta=allsamples.fasta, processors=' + p + ')\n')
     f.close()
+
+    os.chdir(path + 'mothur/')
+    run('mothur ../batch.mothur')
 
 # Clean up temp files from demultiplexing and trimming
 def clean(k, f):
