@@ -28,3 +28,5 @@ system(sed -r 's/(\tk__.*;.*;.*;.*;.*;.*;.*;).*;/\1/g' allsamples.good.unique.go
 make.biom(shared=current, constaxonomy=allsamples.last_removed.0.03.cons.taxonomy)
 system(mkdir rabund)
 system(mv *.rabund rabund/)
+tree.shared(shared=current)
+count.groups(shared=current)

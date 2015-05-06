@@ -22,7 +22,6 @@ def main():
     forw = ''
     rev = ''
     keep = False
-    proc = '1'
     scriptdir = os.getcwd()
 
     try:
@@ -83,7 +82,6 @@ def main():
         qc(i)
     print('QC complete. WARNING errors generally indicate one or more empty samples')
     clean(keep, (path + 'trimmed/'))
-    mothur(path, proc, scriptdir)
 
 # Simplify running bash commands
 def run(cmd):
@@ -158,49 +156,6 @@ def qc(f):
            ' -fastaout ' + f.replace('/trimmed/', '/quality_filtered/').replace('.fastq', '.fasta') + 
            ' -fastq_maxee 6 -quiet')
     run(cmd)
-
-# Generate a make.contigs() mothur command with all samples
-def gen_makegroups(path):
-    os.chdir(path)
-    full = glob.glob('*.fasta')
-    files = []
-    for f in full:
-        if os.path.getsize(path + '/' + f) == 0:
-            continue
-        else:
-            files.append(f)
-    
-    groupcmd = 'make.group(fasta='
-    mergecmd = 'merge.files(input='
-    for f in files:
-        groupcmd = groupcmd + f + '-'
-        mergecmd = mergecmd + f + '-'
-    groupcmd = groupcmd.rstrip('-') + ', groups='
-    mergecmd = mergecmd.rstrip('-') + ', output=allsamples.fasta)\n'
-    for f in files:
-        groupcmd = groupcmd + f.replace('.fasta', '') + '-'
-    groupcmd = groupcmd.rstrip('-') + ')\n'
-    mothurcmd = groupcmd + mergecmd
-    return mothurcmd
-
-# Generate initial mothur commands and run mothur batch file
-def mothur(path, p, s):
-    f = open('batch.mothur', 'r')
-    tmp = f.readlines()
-    f.close()
-    f = open((path + 'batch.mothur'), 'w')
-    for i, line in enumerate(tmp):
-        f.write(line)
-        if i == 0:
-            f.write('set.dir(input=' + path + 'quality_filtered)\n')
-            f.write(gen_makegroups(path + 'quality_filtered'))
-            f.write('set.dir(input=' + path + 'mothur, output='+ path + 'mothur)\n')
-            f.write('system(mv ' + path + 'quality_filtered/mergegroups ' + path + 'mothur)\n')
-            f.write('summary.seqs(fasta=allsamples.fasta, processors=' + p + ')\n')
-    f.close()
-
-    os.chdir(path + 'mothur/')
-    run('mothur ../batch.mothur')
 
 # Clean up temp files from demultiplexing and trimming
 def clean(k, f):
