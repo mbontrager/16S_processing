@@ -154,7 +154,7 @@ def check_files(path, f, tag):
 def qc(f):
     cmd = ('../tools/usearch8 -fastq_filter ' + f + 
            ' -fastaout ' + f.replace('/trimmed/', '/quality_filtered/').replace('.fastq', '.fasta') + 
-           ' -fastq_maxee 6 -quiet')
+           ' -fastq_maxee 4 -quiet')
     run(cmd)
 
 # Clean up temp files from demultiplexing and trimming

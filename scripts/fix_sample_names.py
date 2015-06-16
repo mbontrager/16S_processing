@@ -15,8 +15,6 @@ import os, sys, getopt
 # Author: Martin Bontrager
 ############################################################
 
-
-
 def main():
 
     repl = (('MILE_1U', 'MIE'), ('MILE-1U', 'MIE'), ('_1', ''), ('_2', ''), ('-2', ''), ('-1', ''), ('LOUW01', 'LOW'), ('SJPE', 'SJE'),
