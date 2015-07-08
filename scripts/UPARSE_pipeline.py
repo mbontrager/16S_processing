@@ -59,8 +59,7 @@ def main():
     # Dereplicate sequences and sort by binned size
     run('usearch8 -derep_fulllength concatenated.good.fa -fastaout' + 
         ' uniques.fasta -sizeout -threads 5 -relabel BIN')
-    run('usearch8 -sortbysize uniques.fasta -fastaout seqs_sorted.fasta ' +
-        '-minsize 2')
+    run('usearch8 -sortbysize uniques.fasta -fastaout seqs_sorted.fasta')
     # Cluster into OTUs @ 97% ID
     run('usearch8 -cluster_otus seqs_sorted.fasta -otus otus.fa' + 
         ' -uparseout results.txt -relabel OTU_ -sizeout')
@@ -88,9 +87,12 @@ def main():
     run('mv otu.uchime.good.filter.fasta alignment.fasta')
     run('/media/DATA/programs/FastTreeMP -gtr -nt alignment.fasta' + 
         ' > FastTree2.tre')
+    run('sed "s/\(OTU_[0-9]*\);size=[0-9]*;/\\1/g" <FastTree2.tre' + 
+        ' >ParsedFastTree21.tre')
     # Clean and organize
     run('mkdir ../UPARSE')
-    run('mv otutable.txt alignment.fasta FastTree2.tre ../UPARSE')
+    run('mv otutable.txt alignment.fasta ParsedFastTree2.tre ../UPARSE')
+    run('mv FastTree2.tre ../UPARSE')
     run('mv otu.uchime.gg* results.txt ../UPARSE')
     run('rm mothur* otu* readmap.uc')
     
