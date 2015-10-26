@@ -88,7 +88,7 @@ def main():
     run('/media/DATA/programs/FastTreeMP -gtr -nt alignment.fasta' + 
         ' > FastTree2.tre')
     run('sed "s/\(OTU_[0-9]*\);size=[0-9]*;/\\1/g" <FastTree2.tre' + 
-        ' >ParsedFastTree21.tre')
+        ' >ParsedFastTree2.tre')
     # Clean and organize
     run('mkdir ../UPARSE')
     run('mv otutable.txt alignment.fasta ParsedFastTree2.tre ../UPARSE')
