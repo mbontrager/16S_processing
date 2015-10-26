@@ -18,7 +18,7 @@ import os, sys, getopt
 def main():
 
     repl = (('MILE_1U', 'MIE'), ('MILE-1U', 'MIE'), ('_1', ''), ('_2', ''), ('-2', ''), ('-1', ''), ('LOUW01', 'LOW'), ('SJPE', 'SJE'),
-            ('BRADE', 'BRE'), ('V1W01', 'V1W'), ('LOUE', 'LOE'), ('BRADW', 'BRW'), ('MILW1', 'MIW'), ('VIE', 'V1E'))
+            ('BRADE', 'BRE'), ('V1W01', 'V1W'), ('LOUE', 'LOE'), ('BRADW', 'BRW'), ('MILW1', 'MIW'), ('VIE', 'V1E'), ('W-', 'W'), ('AE-', 'AE'))
     csv_file = ''
 
     try:

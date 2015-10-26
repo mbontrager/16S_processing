@@ -12,7 +12,7 @@ import os, sys, getopt, glob, subprocess, shutil
 # email mbontrager@gmail.com if you need the databases.
 #
 # Usage: Run from script directory:
-# UPARSE_pipeline.py - path/to/fasta/dir
+# UPARSE_pipeline.py -p path/to/fasta/dir
 #
 # Author: Martin Bontrager
 ############################################################
@@ -23,7 +23,7 @@ def main():
     try:
         opts, args = getopt.getopt(sys.argv[1:],'hp:',['path='])
     except getopt.GetoptError:
-        print('UPARSE_pipeline.py - path/to/fasta/dir')
+        print('UPARSE_pipeline.py -p path/to/fasta/dir')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
