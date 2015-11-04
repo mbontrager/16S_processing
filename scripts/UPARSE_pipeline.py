@@ -8,7 +8,8 @@ import os, sys, getopt, glob, subprocess, shutil
 #
 # Full path to "quality_filtered" directory from demux_samples.py
 # Requires UPARSE gold database, greengenes fasta, greengenes taxonomy in 
-# "../database". These are relatively large databases (GG especially)
+# "../database" (relative to the "quality_filtered" directory). 
+# These are relatively large databases (GG especially).
 # email mbontrager@gmail.com if you need the databases.
 #
 # Usage: Run from script directory:
@@ -27,7 +28,7 @@ def main():
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('UPARSE_pipeline.py - path/to/fasta/dir')
+            print('UPARSE_pipeline.py -p path/to/fasta/dir')
             sys.exit()
         elif opt in ('-p', '--path'):
             path = arg
