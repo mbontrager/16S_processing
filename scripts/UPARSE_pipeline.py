@@ -53,20 +53,20 @@ def main():
     run('rm -r fixed_headers/')
     
     # Screen for short/long sequences:
-    cmd = ('mothur135 \"#screen.seqs(fasta=concatenated.fa,' + 
-           ' minlength=390, maxlength=450, processors=5)\"')
+    cmd = ('mothur135 "#screen.seqs(fasta=concatenated.fa,' + 
+           ' minlength=390, maxlength=450, processors=5)"')
     run(cmd)
     run('rm concatenated.bad.accnos concatenated.fa')
     # Dereplicate sequences and sort by binned size
     run('usearch8 -derep_fulllength concatenated.good.fa -fastaout' + 
-        ' uniques.fasta -sizeout -threads 5 -relabel BIN')
+        ' uniques.fasta -sizeout -threads 2 -relabel BIN')
     run('usearch8 -sortbysize uniques.fasta -fastaout seqs_sorted.fasta')
     # Cluster into OTUs @ 97% ID
     run('usearch8 -cluster_otus seqs_sorted.fasta -otus otus.fa' + 
         ' -uparseout results.txt -relabel OTU_ -sizeout')
     # Filter out remaining chimeric reads and generate output table
     run('usearch8 -uchime_ref otus.fa -db ../database/uchime_gold.fa ' + 
-        '-nonchimeras otu.uchime.fa -strand plus -threads 5')
+        '-nonchimeras otu.uchime.fa -strand plus -threads 2')
     run('usearch8 -usearch_global concatenated.good.fa -db otu.uchime.fa ' + 
         '-strand plus -id 0.97 -uc readmap.uc -maxaccepts 8 -maxrejects 64 ' + 
         '-top_hit_only')
