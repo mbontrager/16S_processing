@@ -34,8 +34,10 @@ def main():
 
     for k, v in d.items():
         new_key = re.sub(r'(OTU_.*);.*;', r'\1', k)
-        tax_list = ["Unknown"] * 7
+        tax_list = ["Unclassified"] * 7
         fix_d[new_key] = tax_list
+
+        v = re.sub('"Bacteroidetes"_incertae_sedis', 'Bacteroidetes_incertae_sedis', v)
 
         dom = re.match('d:([^,]*).*$', v)
         if dom:
