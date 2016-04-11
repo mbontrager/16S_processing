@@ -18,6 +18,8 @@ import os, sys, getopt, glob, subprocess, shutil
 # Author: Martin Bontrager
 ############################################################
 
+subsample = True # Change to True if total input size is > 4.0GB
+
 def main():
     path = ''
     
@@ -35,6 +37,14 @@ def main():
     
     os.chdir(path)
     sample_list = glob.glob('*.fasta')
+    
+    # Sub-sample fasta files since the latest batch is too big to process
+    if subsample:
+        for f in sample_list:
+            cmd = ('mothur "#sub.sample(fasta=' + f + ')"')
+            run(cmd)
+        sample_list = glob.glob('*.subsample.fasta')
+        
     add_name_to_header(sample_list)
     run('mkdir fixed_headers')
     run('mv *.fa fixed_headers')
@@ -57,8 +67,8 @@ def main():
            ' minlength=390, maxlength=450, processors=5)"')
     run(cmd)
     run('rm concatenated.bad.accnos concatenated.fa')
-    # Dereplicate sequences and sort by binned size, discard singletons(
-    # See UPARSE documenation)
+    # # Dereplicate sequences and sort by binned size, discard singletons(
+    # # See UPARSE documenation)
     run('usearch -derep_fulllength concatenated.good.fa -fastaout' + 
         ' uniques.fasta -sizeout -threads 2 -relabel BIN')
     run('usearch -sortbysize uniques.fasta -fastaout seqs_sorted.fasta' +
@@ -91,15 +101,16 @@ def main():
     run('sed "s/\(OTU_[0-9]*\);size=[0-9]*;/\\1/g" <FastTree2.tre' + 
         ' >ParsedFastTree2.tre')
     # Clean and organize
-    run('mkdir ../2015-11-17_UPARSE')
+    run('mkdir ../2016-04-09_UPARSE')
     run('mv otutable.txt alignment.fasta ParsedFastTree2.tre otus_tax.fa ' +
-        'aln.txt FastTree2.tre ../2015-11-17_UPARSE')
-    run('mv results.txt ../2015-11-17_UPARSE')
+        'aln.txt FastTree2.tre ../2016-04-09_UPARSE')
+    run('mv results.txt ../2016-04-09_UPARSE')
     run('rm mothur* otu* readmap.uc')
  
 def add_name_to_header(files):
     for i in files:
-        name = i.replace('.fasta', '')
+        name = i.replace('.subsample.fasta', '')
+        name = name.replace('.fasta', '')
         cmd = ('sed \"-es/^>\(.*\)/>\\1;barcodelabel=' + name + ';/\" < ' + 
         i + ' > ' + name + '.fa')
  
