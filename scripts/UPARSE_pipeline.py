@@ -49,8 +49,8 @@ def main():
     run('mkdir fixed_headers')
     run('mv *.fa fixed_headers')
 
-    screen()
     pool()
+    screen()
     usearch()
     mothur()
 
