@@ -19,7 +19,7 @@ import os, sys, getopt, glob, subprocess, shutil
 ############################################################
 
 # Change to True if input files are larger than 4 GB (limit for usearch)
-subsample = True
+subsample = False
 
 def main():
     path = ''
@@ -44,7 +44,7 @@ def main():
         for f in sample_list:
             cmd = ('mothur "#sub.sample(fasta=' + f + ')"')
             run(cmd)
-        sample_list = glob.glob('*.subsample.fasta')
+        sample_list = glob.glob('*.fasta')
     add_name_to_header(sample_list)
     run('mkdir fixed_headers')
     run('mv *.fa fixed_headers')

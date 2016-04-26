@@ -18,6 +18,7 @@ import os, sys, getopt
 def main():
 
     repl = (('PONTE-1', 'POE1'), ('PONTE-2', 'POE2'), ('MILE_1U', 'MIE'),
+            ('BHBE-1', 'BBE1'), ('BHBE-2', 'BBE2'),
             ('_1', ''), ('_2', ''), ('_3', ''), ('_4', ''),
             ('_5', ''), ('_6', ''), ('-2', ''), ('-1', ''), ('LOUW01', 'LOW'),
             ('SJPE', 'SJE'), ('BRADE', 'BRE'), ('V1W01', 'V1W'),
