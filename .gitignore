@@ -6,3 +6,4 @@ database/
 maps/
 scripts/.directory
 *.RData
+manuscript_analyses/rarefaction_cache/
