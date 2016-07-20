@@ -3,6 +3,7 @@ output: html_document
 ---
 #E affinis 16S analysis
 ### Martin Bontrager
+### Data pre-processing
 
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_preprocess/',
@@ -10,6 +11,8 @@ knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_preprocess/',
 ```
 
 # Sample Summary
+
+First I will read in all of the raw count data, the phylogenetic tree, and the taxonomy. These data were all generated from the "UPARSE_pipeline.py" script.
 
 ```{r read_data}
 library(phyloseq)
@@ -77,24 +80,27 @@ rm(OTU, TAX, fasttree, taxTable, taxmat, sampleData, removeWords, otuTable,
 physeq <- prune_samples(sample_sums(physeq)>=500, physeq)
 
 # Remove halomonas,shewanella, and propionobacterium contaminants
+# We've identified these as contaminants based on negative control samples
+# and their absence from our first round of sequencing. 
 contaminants <- !(taxa_names(physeq) %in% c("OTU_1", "OTU_5", "OTU_45"))
 physeq <- prune_taxa(contaminants, physeq)
 
-# Remove samples because they are either old (RAE), highly contaminated(MIE, TBE), redundant (V2E) or 
-# inappropriate (V1W due to use of the 0.8 micron filter)
+# Remove samples because they are either old (RAE), highly contaminated(MIE, TBE), redundant (V2E) or inappropriate (V1W due to use of the 0.8 micron filter)
 a <- sample_names(physeq) %in% c("AE", "V1W", "V1Wp", "V2E", "VGUN", "LOGUN", "VG", "VE", "V1Ep", "RE", "CE", "BBE1", "MIE", "MIW", "TBE", "TBW", "BBE2", "POE1", "POE2", "RAE", "RAW", "SJE")
-
 physeq <- prune_samples(!a, physeq)
 
-# Remove OTUs with zero representatives (now that samples have been trimmed)
+# Remove OTUs with zero representatives now that samples have been trimmed
 physeq <- prune_taxa(taxa_sums(physeq) > 1, physeq)
 
-# Export csv count table if necessary
-# I normalize everything percent of total per sample (better normalization is performed in during
-# beta diversity analyses)
+# Export csv count table if necessary (for the sake of exploration)
+# I either normalize everything percent of total per sample or just 
+# leave the raw count data depending on if line 1 or 2 of the if 
+# statement is commented out. Better normalization with variance stabilization
+# is performed during beta diversity analyses
+
 if (output_table){
-    physeq1 <- transform_sample_counts(physeq, function(x) round(100 * (x/sum(x)), 2))
-    #physeq1 <- physeq
+    #physeq1 <- transform_sample_counts(physeq, function(x) round(100 * (x/sum(x)), 2))
+    physeq1 <- physeq
     b <- psmelt(physeq1)[, 1:3]
     c <- dcast(b, OTU ~ Sample)
     e <- as.data.frame(tax_table(physeq))
@@ -104,23 +110,11 @@ if (output_table){
     d <- as.numeric(d)
     f$OTU <- sprintf("OTU_%05d", d)
     f <- f[order(f$OTU),]
-    write.csv(f, "output/sample_matrix_paired_relative_abundance.csv")
+    write.csv(f, "output/sample_matrix_raw_counts.csv")
     rm(physeq1, b, c, d, e, f)
 }
 
-# Arrange data for easy parsing of shared presence/absence
-b <- psmelt(physeq)[, 1:3]
-c <- dcast(b, OTU ~ Sample)
-e <- as.data.frame(tax_table(physeq))
-e <- cbind(OTU = rownames(e), e)
-f <- merge(e, c, by = "OTU")
-d <- sapply(f[,1], function(x) gsub("OTU_", "", x), USE.NAMES = FALSE)
-d <- as.numeric(d)
-f$OTU <- sprintf("OTU_%05d", d)
-countTable <- f[order(f$OTU),]
-rm(b, c, d, e, f)
-
-# Print a table of read counts
+# Print a table of read counts for each sample
 read_count <- as.data.frame(sample_sums(physeq))
 read_count <- cbind(Sample=rownames(read_count), read_count)
 sdata <- sample_data(physeq)
@@ -129,7 +123,7 @@ metadata <- merge(read_count, sdata, by = "Sample")[,1:11]
 colnames(metadata)[2] <- "ReadCount"
 kable(metadata)
 
-# Print mean and median sample sums
+# Print mean and median sample read counts
 print(summary(sample_sums(physeq)))
 
 # Output phyloseq data for subsequent analysis
