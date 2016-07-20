@@ -1,0 +1,440 @@
+---
+output: html_document
+---
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_abundance/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(ape)
+library(plyr)
+
+set.seed(3399)
+
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+## Standardize abundances by relative abundance:
+physeq_relative <- transform_sample_counts(physeq, function(x) x / sum(x))
+
+rm(taxmat, sampleData, otuTable, taxTable, tree)
+
+water <- c("BBW", "BRW", "CBW", "EUW", "FRW", "IJW", "LOW", "MAW", "MMW", "POW", "RMW", "SCW", "TXW", "VIW")
+copepod <- c("BRE", "BBE", "CBE", "EUE", "FRE", "IJE", "LOE", "MAE", "MME", "POE", "RME", "SCE", "TXE", "VIE")
+
+# ## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+```
+
+#Abundance Bar Plots
+
+
+I have transformed the data by relative abundance. I am plotting only the most abundance phyla and the composition of the phyla.
+
+## Abundance by Phylum
+
+``` {r abundance_phylum}
+theme_set(theme_bw())
+
+# Plotting function. Feed in a phyloseq object and a color value object
+comparison_plot <- function(matr, color_val, label = "Sample", fill = "Phylum", title = NULL){
+    aa <- psmelt(matr)
+    .e <- environment()
+    
+    p <- ggplot(aa, aes_string(x = label, y = "Abundance", fill = fill), environment = .e) +
+    geom_bar(aes(order=desc(aa[,fill])),
+                     stat = "identity", 
+                     position = "stack", 
+                     color = "black") +
+    scale_fill_manual(values = color_val) +
+    guides(fill=guide_legend(ncol=2)) +
+    theme(axis.title.y = element_text(angle=90, size=20),
+          axis.title.x = element_text(size=20),
+          axis.text.x = element_text(angle = 90, hjust=0, vjust=0.5, size=18),
+          plot.title = element_blank())
+    
+    return(p)
+}
+
+# I only look at the top 10 phyla
+physeq_glom <- tax_glom(physeq, "Phylum")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:10]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Phylum))
+color_val <- sample(getPalette(colorCount))
+
+comparison_plot(a, color_val, label = "Code", title = "Abundance by Phylum") +
+    guides(fill=guide_legend(ncol=1)) + 
+    ggtitle(title)
+
+cop <- subset_samples(a, Environment=="Copepod")
+wat <- subset_samples(a, Environment=="Water")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", title = "Abundance by Phylum in Copepods") +
+    guides(fill=guide_legend(ncol=1)) + 
+    ggtitle(title)
+comparison_plot(wat, color_val, label = "Code", title = "Abundance by Phylum in Water") +
+    guides(fill=guide_legend(ncol=1)) + 
+    ggtitle(title)
+```
+
+#Test for unequal variances at the phylum level
+
+```{r unequal_var_phylum}
+library(reshape2)
+#Get top 10 phyla for each water and copepods
+cop <- subset_samples(physeq_rel_glom, Environment=="Copepod")
+cop <- prune_taxa(names(sort(taxa_sums(cop), decreasing = TRUE)[1:10]), cop)
+wat <- subset_samples(physeq_rel_glom, Environment=="Water")
+wat <- prune_taxa(names(sort(taxa_sums(wat), decreasing = TRUE)[1:10]), wat)
+
+a <- psmelt(wat)[, 1:3]
+b <- psmelt(cop)[, 1:3]
+ab <- rbind(a, b)
+c <- dcast(ab, OTU ~ Sample, value.var = "Abundance")
+e <- as.data.frame(tax_table(physeq))
+e <- cbind(OTU = rownames(e), e)
+f <- merge(e, c, by = "OTU")
+d <- sapply(f[,1], function(x) gsub("OTU_", "", x), USE.NAMES = FALSE)
+d <- as.numeric(d)
+f$OTU <- sprintf("OTU_%05d", d)
+f <- f[order(f$OTU),]
+wrong_cols <- c("OTU", "Kingdom", "Class", "Order", "Family", "Genus", "Species")
+f <- f[, !(colnames(f) %in% wrong_cols)]
+rownames(f) <- f[,1]
+f$Phylum <- NULL
+f <- t(f)
+write.csv(f, "output/sample_matrix_phylum_relative.csv")
+
+c <- f[(rownames(f) %in% copepod), ]
+c <- c[, colSums(is.na(c)) != nrow(c)]
+c <- c[, order(colSums(c), decreasing = TRUE)]
+w <- f[(rownames(f) %in% water), ]
+w <- w[, colSums(is.na(w)) != nrow(w)]
+w <- w[, order(colSums(w), decreasing = TRUE)]
+
+for(i in 1:10){
+    print(var.test(c[,i], w[,i]))
+}
+
+```
+
+#Abundance by phylum in merged samples
+
+``` {r merged, fig.width=6, fig.height=4}
+# Bar plots of abundance for merged copepod vs. water samples
+merged_env <- merge_samples(physeq, "Environment")
+merged_env <- transform_sample_counts(merged_env, function(x) x / sum(x))
+merged_env_rel <- tax_glom(merged_env, "Phylum")
+a <- prune_taxa(names(sort(taxa_sums(merged_env_rel), decreasing = TRUE)[1:10]), 
+                merged_env_rel)
+pdf("fig-phylum_abundance_by_env", width=6, height=4)
+comparison_plot(a, color_val) + 
+    guides(fill=guide_legend(ncol=1)) + 
+     theme(axis.title.y = element_text(angle=90),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(angle=0, hjust=0.5, vjust=0.5),
+          plot.title = element_blank())
+dev.off()
+```
+
+## Abundance by Class
+
+```{r abundance_class}
+# I only look at the top 20 Classes
+physeq_glom <- tax_glom(physeq, "Class")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:10]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Class))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+wat <- subset_samples(a, Environment=="Water")
+
+#Plotting (to get the bar order consistent)
+pdf("figS-Abundance_class_copepods.pdf", height=6, width=9)
+comparison_plot(cop, color_val, label = "Code", fill = "Class") +
+    guides(fill=guide_legend(ncol=1)) 
+dev.off()
+
+pdf("figS-Abundance_class_water.pdf", height=6, width=9)
+comparison_plot(wat, color_val, label = "Code", fill = "Class") +
+    guides(fill=guide_legend(ncol=1))
+dev.off()
+```
+
+#Test unequal variance in Classes
+
+```{r unequal_var_class}
+library(reshape2)
+
+#Get top 10 phyla for each water and copepods
+cop <- subset_samples(physeq_rel_glom, Environment=="Copepod")
+cop <- prune_taxa(names(sort(taxa_sums(cop), decreasing = TRUE)[1:10]), cop)
+wat <- subset_samples(physeq_rel_glom, Environment=="Water")
+wat <- prune_taxa(names(sort(taxa_sums(wat), decreasing = TRUE)[1:10]), wat)
+
+a <- psmelt(wat)[, 1:3]
+b <- psmelt(cop)[, 1:3]
+ab <- rbind(a, b)
+c <- dcast(ab, OTU ~ Sample, value.var = "Abundance")
+e <- as.data.frame(tax_table(physeq))
+e <- cbind(OTU = rownames(e), e)
+f <- merge(e, c, by = "OTU")
+d <- sapply(f[,1], function(x) gsub("OTU_", "", x), USE.NAMES = FALSE)
+d <- as.numeric(d)
+f$OTU <- sprintf("OTU_%05d", d)
+f <- f[order(f$OTU),]
+wrong_cols <- c("OTU", "Kingdom", "Phylum", "Order", "Family", "Genus", "Species")
+f <- f[, !(colnames(f) %in% wrong_cols)]
+f$Class <- as.character(f$Class)
+f$Class[4] <- "unclassified_1"
+f$Class[10:11] <- c("unclassified_2", "unclassified_3")
+rownames(f) <- f[,1]
+f$Class <- NULL
+f <- t(f)
+write.csv(f, "output/sample_matrix_class_relative.csv")
+
+c <- f[(rownames(f) %in% copepod), ]
+c <- c[, colSums(is.na(c)) != nrow(c)]
+c <- c[, order(colSums(c), decreasing = TRUE)]
+w <- f[(rownames(f) %in% water), ]
+w <- w[, colSums(is.na(w)) != nrow(w)]
+w <- w[, order(colSums(w), decreasing = TRUE)]
+
+for(i in 1:10){
+    print(var.test(c[,i], w[,i], alternative = "greater"))
+}
+
+library(matrixStats)
+a <- colVars(c)
+b <- colVars(w)
+
+t.test(a, b, alternative="greater")
+```
+
+## Abundance by Order
+
+```{r abundance_order}
+# I only look at the top 32 taxa
+physeq_glom <- tax_glom(physeq, "Order")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:32]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Order))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+wat <- subset_samples(a, Environment=="Water")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", 
+                title = "Abundance by Order in Copepods", fill = "Order") + 
+    ggtitle(title)
+comparison_plot(wat, color_val, label = "Code", title = "Abundance by Order in Water", 
+                fill = "Order") + 
+    ggtitle(title)
+```
+
+## Abundance by Family
+
+```{r abundance_family}
+# I only look at the top 32 taxa
+physeq_glom <- tax_glom(physeq, "Family")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:32]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Family))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+wat <- subset_samples(a, Environment=="Water")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", title = "Abundance by Family in Copepods", 
+                fill = "Family") + 
+    ggtitle(title)
+comparison_plot(wat, color_val, label = "Code", title = "Abundance by Family in Water", 
+                fill = "Family") + 
+    ggtitle(title)
+```
+
+## Abundance by genus
+
+```{r abundance_genus}
+# I only look at the top 32 taxa
+physeq_glom <- tax_glom(physeq, "Genus")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:32]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Genus))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+wat <- subset_samples(a, Environment=="Water")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", title = "Abundance by Genus in Copepods", 
+                fill = "Genus") + 
+    ggtitle(title)
+comparison_plot(wat, color_val, label = "Code", title = "Abundance by Genus in Water", 
+                fill = "Genus") + 
+    ggtitle(title)
+```
+
+## Without common phlya
+
+Now I think it might be interesting to look at these plots excluding all actinobacteria, proteobacteria, and bacteroides (The vast majority of taxa belong to those phyla)
+
+```{r remove_common}
+theme_set(theme_bw())
+physeq_glom <- tax_glom(physeq, "Phylum")
+physeq_rel_phyla <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+physeq_uncommon_phyla <- subset_taxa(physeq_rel_phyla, 
+                        (Phylum != "Proteobacteria" & 
+                         Phylum != "Actinobacteria" & 
+                         Phylum != "Bacteroidetes"))
+
+colorCount <- length(levels(as.data.frame(tax_table(physeq_uncommon_phyla))$Phylum))
+color_val <- sample(getPalette(colorCount))
+
+cop <- subset_samples(physeq_uncommon_phyla, Environment=="Copepod")
+wat <- subset_samples(physeq_uncommon_phyla, Environment=="Water")
+
+comparison_plot(cop, color_val, label = "Code")
+comparison_plot(wat, color_val, label = "Code")
+```
+
+
+##Abundance within common phyla
+
+```{r proteobacteria}
+theme_set(theme_bw())
+proteos <- subset_taxa(physeq_relative, Phylum=="Proteobacteria")
+proteos_by_class <- tax_glom(proteos, "Class")
+colorCount <- length(levels(as.data.frame(tax_table(proteos_by_class))$Class))
+color_val <- sample(brewer.pal(colorCount, "Set1"))
+
+cop <- subset_samples(proteos_by_class, Environment=="Copepod")
+wat <- subset_samples(proteos_by_class, Environment=="Water")
+
+#Comparison plots
+comparison_plot(cop, color_val, label = "Code", 
+                title = "Proteobacteria Abundance in Copepods", 
+                fill = "Class")
+
+title <- "Proteobacteria Abundance in Water"
+comparison_plot(wat, color_val, label = "Code", title = title, fill = "Class")
+
+proteos <- subset_taxa(physeq_relative, Phylum=="Proteobacteria")
+proteos_by_family <- tax_glom(proteos, "Family")
+colorCount <- length(levels(as.data.frame(tax_table(proteos_by_family))$Family))
+color_val <- sample(getPalette(colorCount))
+
+cop <- subset_samples(proteos_by_family, Environment=="Copepod")
+wat <- subset_samples(proteos_by_family, Environment=="Water")
+
+title <- "Proteobacteria Abundance in Copepods by Family"
+comparison_plot(cop, color_val, label = "Code", title = title, fill = "Family")
+
+title <- "Proteobacteria Abundance in Water by Family"
+comparison_plot(wat, color_val, label = "Code", title = title, fill = "Family")
+
+```
+
+```{r actinomycetes}
+# Do the same for actinomycetes
+actinos <- subset_taxa(physeq_relative, Phylum=="Actinobacteria")
+actinos_by_class <- tax_glom(actinos, "Class")
+a <- as.vector(tax_table(actinos_by_class)[, "Class"])
+colorCount <- length(unique(a))
+color_val <- sample(brewer.pal(colorCount, "Set1"))
+
+cop <- subset_samples(actinos_by_class, Environment=="Copepod")
+wat <- subset_samples(actinos_by_class, Environment=="Water")
+
+title <- "Actinobacteria Abundance in Copepods"
+comparison_plot(cop, color_val, label = "Code", title = title, fill = "Class")
+
+title <- "Actinobacteria Abundance in Water"
+comparison_plot(wat, color_val, label = "Code", title = title, fill = "Class")
+
+#Now plot actinos by family
+actinos <- subset_taxa(physeq_relative, Phylum=="Actinobacteria")
+actinos_by_family <- tax_glom(actinos, "Family")
+colorCount <- length(levels(as.data.frame(tax_table(actinos_by_family))$Family))
+color_val <- sample(getPalette(colorCount))
+
+cop <- subset_samples(actinos_by_family, Environment=="Copepod")
+wat <- subset_samples(actinos_by_family, Environment=="Water")
+
+title <- "Actinobacteria Abundance in Copepods"
+comparison_plot(cop, color_val, label = "Code", title = title, fill = "Family")
+
+title <- "Actinobacteria Abundance in Water"
+comparison_plot(wat, color_val, label = "Code", title = title, fill = "Family")
+```
+
+
+``` {r bacteroidetes}
+# Do the same for Bacteroidetes
+bact <- subset_taxa(physeq_relative, Phylum=="Bacteroidetes")
+bact_by_class <- tax_glom(bact, "Class")
+a <- as.vector(tax_table(bact_by_class)[, "Class"])
+colorCount <- length(unique(a))
+color_val <- sample(getPalette(colorCount))
+
+cop <- subset_samples(bact_by_class, Environment=="Copepod")
+wat <- subset_samples(bact_by_class, Environment=="Water")
+
+title <- "Bacteroidetes Abundance in Copepods"
+comparison_plot(cop, color_val, label = "Code", title = title, fill = "Class")
+
+title <- "Bacteroidetes Abundance in Water"
+comparison_plot(wat, color_val, label = "Code", title = title, fill = "Class")
+
+```

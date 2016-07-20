@@ -1,0 +1,266 @@
+---
+output: html_document
+---
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_foldchange/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(plyr)
+library(tidyr)
+library(ape)
+library(dplyr)
+library(reshape2)
+library(knitr)
+
+set.seed(9373399)
+
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+rm(taxmat, sampleData, otuTable, taxTable, tree)
+
+## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+```
+
+# Validation
+##Multiple testing
+
+I want to know which taxa are responsible for the major differences between copepods and water. I will do that with validation and FDR correction. Taxa that are significantly different between water/copepods samples:
+
+```{r mul}
+# Following a procedure online, convert phyloseq to DESeq object
+# Perform analyses on "Environment", i.e. which taxa separate copepods and water
+library(DESeq2)
+packageVersion("DESeq2")
+copdds <- phyloseq_to_deseq2(physeq, ~ Environment)
+
+# calculate geometric means prior to estimate size factors
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+# calculate geometric means prior to estimate size factors
+geoMeans <- apply(counts(copdds), 1, gm_mean)
+copdds <- estimateSizeFactors(copdds, geoMeans = geoMeans)
+copdds <- DESeq(copdds, test = "Wald", fitType="local")
+
+#Output and format results
+res <- results(copdds)
+res <- res[order(res$padj, na.last=NA), ]
+alpha <- 0.01
+sigtab <- res[(res$padj < alpha), ]
+sigtab <- cbind(as(sigtab, "data.frame"), as(tax_table(physeq)[rownames(sigtab), ], "matrix"))
+
+write.csv(sigtab, "watervcopepod_signif.csv")
+
+# Positive log fold changes in this case mean abundant taxa in water:
+posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
+# Negative log fold changes mean abundance in copepods
+negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+print("Taxa that are more abundant in water:")
+#kable(head(posigtab, 30))
+print("\n\nTaxa that are more abundant in copepods:")
+#kable(head(negsigtab, 30))
+
+drops <- c("baseMean", "lfcSE", "stat", "pvalue", "Kingdom")
+waterbact <- posigtab[ , !(names(posigtab) %in% drops)]
+rownames(waterbact) <- NULL
+waterbact <- waterbact[c("Phylum", "Class", "Order", "Family", "Genus", "Species", "log2FoldChange", "padj")]
+kable(waterbact)
+
+copbact <- negsigtab[ , !(names(negsigtab) %in% drops)]
+rownames(copbact) <- NULL
+copbact <- copbact[c("Phylum", "Class", "Order", "Family", "Genus", "Species", "log2FoldChange", "padj")]
+kable(copbact)
+```
+
+## Plotting the log fold change
+```{r mulplot}
+theme_set(theme_bw())
+colorCount <- length(levels(sigtab$Phylum))
+sigtabgen <- sigtab
+# Phylum order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Phylum, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Phylum = factor(as.character(sigtabgen$Phylum), levels=names(x))
+# Genus order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
+ggplot(sigtabgen, aes(x=Genus, y=log2FoldChange, color=Phylum)) + 
+    geom_point(size=6) + 
+    scale_colour_manual(values = getPalette(colorCount)) +
+    theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+```
+
+## Saltwater vs. Freshwater (Copepods only)
+
+```{r cop_salt_fresh}
+#Perform analyses on copepods in saltwater vs freshwater
+#, i.e. which taxa are distinct between invasions
+#Subset data for plotting purposes
+copepods_only <- subset_samples(physeq, Environment=="Copepod")
+
+copdds <- phyloseq_to_deseq2(copepods_only, ~ WaterType)
+geoMeans <- apply(counts(copdds), 1, gm_mean)
+copdds <- estimateSizeFactors(copdds, geoMeans = geoMeans)
+copdds <- DESeq(copdds, fitType = "local")
+
+#Output and format results
+res <- results(copdds)
+res <- res[order(res$padj, na.last=NA), ]
+alpha <- 0.05
+sigtab <- res[(res$padj < alpha), ]
+sigtab <- cbind(as(sigtab, "data.frame"), 
+                as(tax_table(copepods_only)[rownames(sigtab), ], "matrix"))
+
+write.csv(sigtab, "freshvsalt_cop_signif.csv")
+
+posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
+negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+kable(head(posigtab, 30))
+kable(head(negsigtab, 30))
+
+```
+
+## Plotting the log fold change
+```{r mulplot_cop}
+theme_set(theme_bw())
+colorCount <- length(levels(sigtab$Family))
+sigtabgen <- sigtab
+# Family order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Family, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Phylum = factor(as.character(sigtabgen$Family), levels=names(x))
+# Genus order
+x = tapply(sigtabgen$log2FoldChange, sigtabgen$Genus, function(x) max(x))
+x = sort(x, TRUE)
+sigtabgen$Genus = factor(as.character(sigtabgen$Genus), levels=names(x))
+ggplot(sigtabgen, aes(x=Genus, y=log2FoldChange, color=Family)) + 
+    geom_point(size=6) + 
+    scale_colour_manual(values = getPalette(colorCount)) +
+    theme(axis.text.x = element_text(angle = -90, hjust = 0, vjust=0.5))
+```
+
+# Red clade specific taxa
+
+```{r red_clade_taxa}
+#Are there taxa which are only/over-represented in Red clade samples?
+#Subset data for plotting purposes
+copepods_only <- subset_samples(physeq, Environment=="Copepod")
+sample_data(copepods_only)$red <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod Northeast", TRUE, FALSE))
+
+copdds <- phyloseq_to_deseq2(copepods_only, ~ red)
+geoMeans <- apply(counts(copdds), 1, gm_mean)
+copdds <- estimateSizeFactors(copdds, geoMeans = geoMeans)
+copdds <- DESeq(copdds, fitType = "local")
+
+#Output and format results
+res <- results(copdds)
+res <- res[order(res$padj, na.last=NA), ]
+alpha <- 0.05
+sigtab <- res[(res$padj < alpha), ]
+sigtab <- cbind(as(sigtab, "data.frame"), 
+                as(tax_table(copepods_only)[rownames(sigtab), ], "matrix"))
+
+posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
+negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+kable(head(posigtab, 30))
+kable(head(negsigtab, 30))
+```
+
+This shows that there is a taxa labeled as an endosymbiont of Deronectes Platynotus (a beetle) which is also present in all of the red clade copepod sample and absent from the water. Kind of cool!
+
+# Green clade specific taxa
+
+```{r green_clade_taxa}
+#Are there taxa which are only/over-represented in Red clade samples?
+#Subset data for plotting purposes
+copepods_only <- subset_samples(physeq, Environment=="Copepod")
+sample_data(copepods_only)$green <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod South", TRUE, FALSE))
+
+copdds <- phyloseq_to_deseq2(copepods_only, ~ green)
+geoMeans <- apply(counts(copdds), 1, gm_mean)
+copdds <- estimateSizeFactors(copdds, geoMeans = geoMeans)
+copdds <- DESeq(copdds, fitType = "local")
+
+#Output and format results
+res <- results(copdds)
+res <- res[order(res$padj, na.last=NA), ]
+alpha <- 0.05
+sigtab <- res[(res$padj < alpha), ]
+sigtab <- cbind(as(sigtab, "data.frame"), 
+                as(tax_table(copepods_only)[rownames(sigtab), ], "matrix"))
+
+posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
+negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+kable(head(posigtab, 30))
+kable(head(negsigtab, 30))
+```
+
+There are a few taxa that are overrepresented in green clade, and interestingly there are also several taxa which are underrepresented(more of them in purple/red), which might be a latitudinal affect?
+
+# Purple clade specific taxa
+
+```{r purple_clade_taxa}
+#Are there taxa which are only/over-represented in Red clade samples?
+#Subset data for plotting purposes
+copepods_only <- subset_samples(physeq, Environment=="Copepod")
+sample_data(copepods_only)$purple <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod Europe", TRUE, FALSE))
+
+copdds <- phyloseq_to_deseq2(copepods_only, ~ purple)
+geoMeans <- apply(counts(copdds), 1, gm_mean)
+copdds <- estimateSizeFactors(copdds, geoMeans = geoMeans)
+copdds <- DESeq(copdds, fitType = "local")
+
+#Output and format results
+res <- results(copdds)
+res <- res[order(res$padj, na.last=NA), ]
+alpha <- 0.05
+sigtab <- res[(res$padj < alpha), ]
+sigtab <- cbind(as(sigtab, "data.frame"), 
+                as(tax_table(copepods_only)[rownames(sigtab), ], "matrix"))
+
+posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
+negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+kable(head(posigtab, 30))
+kable(head(negsigtab, 30))
+```

@@ -5,3 +5,4 @@ scripts/parse_csv.pyc
 database/
 maps/
 scripts/.directory
+*.RData

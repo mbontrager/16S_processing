@@ -1,0 +1,168 @@
+---
+output: html_document
+---
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_diversity_all/',
+                      echo=FALSE, warning=FALSE, message=FALSE, cache = TRUE)
+```
+
+```{r read_data}
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(ape)
+library(reshape2)
+library(dplyr)
+library(knitr)
+
+set.seed(9373399)
+
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+rm(taxmat, sampleData, otuTable, taxTable, tree)
+```
+
+
+```{r ggplottheme}
+# ## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+```
+
+# Rarefaction Curves
+
+Have we sampled the entire diversity of these microbial communities?
+
+```{r rarefaction_curve, eval=FALSE}
+psdata <- physeq
+theme_set(theme_bw())
+colorCount <- length(levels(sample_data(psdata)$Location))
+color_val <- sample(getPalette(colorCount))
+
+# Thanks to this next rarefaction plotting goes to Bela Hausmann 
+# https://github.com/and3k
+# https://github.com/joey711/phyloseq/issues/143#issuecomment-72877017
+
+calculate_rarefaction_curves <- function(psdata, measures, depths) {
+  require('plyr') # ldply
+  require('reshape2') # melt
+
+  estimate_rarified_richness <- function(psdata, measures, depth) {
+    if(max(sample_sums(psdata)) < depth) return()
+    psdata <- prune_samples(sample_sums(psdata) >= depth, psdata)
+
+    rarified_psdata <- rarefy_even_depth(psdata, depth, verbose = FALSE)
+
+    alpha_diversity <- estimate_richness(rarified_psdata, measures = measures)
+
+    # as.matrix forces the use of melt.array, which includes the Sample names (rownames)
+    molten_alpha_diversity <- melt(as.matrix(alpha_diversity), varnames = c('Sample', 'Measure'), value.name = 'Alpha_diversity')
+
+    molten_alpha_diversity
+  }
+
+  names(depths) <- depths # this enables automatic addition of the Depth to the output by ldply
+  rarefaction_curve_data <- ldply(depths, estimate_rarified_richness, psdata = psdata, measures = measures, .id = 'Depth', .progress = ifelse(interactive(), 'text', 'none'))
+
+  # convert Depth from factor to numeric
+  rarefaction_curve_data$Depth <- as.numeric(levels(rarefaction_curve_data$Depth))[rarefaction_curve_data$Depth]
+
+  rarefaction_curve_data
+}
+
+rarefaction_curve_data <- calculate_rarefaction_curves(psdata, c('Observed', 'Shannon'), rep(c(1, 10, 100, 1000, 1:100 * 2500), each = 10))
+summary(rarefaction_curve_data)
+
+# Summarize alpha diversity
+rarefaction_curve_data_summary <- ddply(rarefaction_curve_data, c('Depth', 'Sample', 'Measure'), summarise, Alpha_diversity_mean = mean(Alpha_diversity), Alpha_diversity_sd = sd(Alpha_diversity))
+
+#Merge
+rarefaction_curve_data_summary_verbose <- merge(rarefaction_curve_data_summary, data.frame(sample_data(psdata)), by.x = 'Sample', by.y = 'row.names')
+
+rarefaction_curve_data_summary_verbose_cop <- filter(rarefaction_curve_data_summary_verbose, Environment == 'Copepod', Measure == 'Observed')
+
+rarefaction_curve_data_summary_verbose_wat <- filter(rarefaction_curve_data_summary_verbose, Environment == 'Water', Measure == 'Observed')
+```
+
+
+```{r rare_plots, fig.width=12, fig.height=8}
+pdf("figS2-Copepod_rarefaction", width = 12, height = 8)
+ggplot(
+  data = rarefaction_curve_data_summary_verbose_cop,
+  mapping = aes(
+    x = Depth,
+    y = Alpha_diversity_mean,
+    ymin = Alpha_diversity_mean - Alpha_diversity_sd,
+    ymax = Alpha_diversity_mean + Alpha_diversity_sd,
+    colour = Location,
+    group = Sample)) + 
+    geom_line(size=1.5) + 
+    geom_linerange(size=1) + 
+    scale_colour_manual(values = color_val) +
+    ylab('Diversity (Observed OTUs)') + 
+    xlab('Sequencing Depth') +
+    theme(axis.title.y = element_text(angle=90, size=20),
+              axis.title.x = element_text(size=20),
+              axis.text.x = element_text(size=16),
+              axis.text.y = element_text(size=16),
+              legend.text = element_text(size=14),
+              plot.title = element_text(size=24, face="bold", vjust=2))
+dev.off()
+    
+pdf("figS1-Water_rarefaction.pdf", width = 12, height = 8)
+ggplot(
+  data = rarefaction_curve_data_summary_verbose_wat,
+  mapping = aes(
+    x = Depth,
+    y = Alpha_diversity_mean,
+    ymin = Alpha_diversity_mean - Alpha_diversity_sd,
+    ymax = Alpha_diversity_mean + Alpha_diversity_sd,
+    colour = Location,
+    group = Sample)) + 
+    geom_line(size=1.5) + 
+    geom_linerange(size=1) + 
+    scale_colour_manual(values = color_val) +
+    ylab('Diversity (Observed OTUs)') + 
+    xlab('Sequencing Depth') +
+    theme(axis.title.y = element_text(angle=90, size=20),
+              axis.title.x = element_text(size=20),
+              axis.text.x = element_text(size=16),
+              axis.text.y = element_text(size=16),
+              legend.text = element_text(size=14),
+              plot.title = element_text(size=24, face="bold", vjust=2))
+dev.off()
+
+```

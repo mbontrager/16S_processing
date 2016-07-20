@@ -1,0 +1,415 @@
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_diversity_all/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(ape)
+library(reshape2)
+library(dplyr)
+library(knitr)
+
+set.seed(9373399)
+
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+rm(taxmat, sampleData, otuTable, taxTable, tree)
+```
+
+
+```{r ggplottheme}
+# ## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+
+# Multiple plot function
+# from http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_%28ggplot2%29/
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+
+```
+
+# Alpha Diversity Plots
+
+The first step is to understand within-sample diversity and how it differs between samples. Which samples have the largest diversity? Which have the lowest? Are there patterns? We are unsure of what to expect regarding whether water, gut, or copepod samples have the lowest diversity. Althouogh we do expect copepod gut samples to be equally or less diverse that whole animal samples, since the guts should be a subset of the whole animal.
+
+```{r richness_by_env}
+theme_set(theme_bw())
+colorCount <- length(levels(sample_data(physeq)$Location))
+color_val <- sample(getPalette(colorCount))
+
+physeq_unaltered <- physeq
+physeq <- rarefy_even_depth(physeq)
+
+# Plotting function:
+richness_plot <- function(phy, color_val, xval = "Environment", col = "Location", meas = c("Simpson", "Shannon"), title = "Alpha Diversity"){
+    
+    p <- plot_richness(phy, x = xval, color = col, measures = meas) + 
+        scale_colour_manual(values = color_val) +
+        geom_point(size = 5, alpha = 1.0) + 
+        theme(axis.title.y = element_text(angle=90, size=20),
+              axis.title.x = element_text(size=20),
+              axis.text.x = element_text(angle=90, size=16),
+              legend.text = element_text(size=14),
+              plot.title = element_blank()) + 
+        ylab("Diversity")
+    
+    return(p)
+}
+
+#Plot alpha diversity estimates across samples
+alpha1 <- richness_plot(physeq, color_val, meas = c("Observed", "Chao1", "Simpson", "Shannon"))
+alpha1
+richness_plot(physeq, color_val, meas = c("Observed", "Chao1", "Simpson", "Shannon")) + 
+    geom_boxplot(data=alpha1$data, aes(x=Environment, y=value, color=NULL), alpha=0.1)
+
+color_val <- c("red", "blue")
+richness_plot(physeq, color_val, col = "Environment", meas = c("Observed", "Chao1", "Simpson", "Shannon")) + 
+    geom_boxplot(data=alpha1$data, aes(x=Environment, y=value, color=NULL), alpha=0.1)
+
+adiv <- estimate_richness(physeq, measures=c("Chao1", "Shannon", "Observed", 
+                                             "Simpson","ACE"))
+
+# Print a table of alpha diversity estimates
+kable(adiv)
+
+#Add metadata to diversity estimate table and remove Gut, unpaired water/cop samples
+adiv <- merge(adiv, sample_data(physeq), by="row.names")
+adiv_all <- adiv
+adiv <- filter(adiv, !(Location %in% c("Montmagnay", "Lisle Verte")))
+adiv <- filter(adiv, !(Row.names %in% c("VE", "RE", "CE", "MAE", "SJE", "V1E", "V1Ep")))
+
+# Filter out just water and copepod samples
+adivW <- filter(adiv, Environment == "Water")
+adivC <- filter(adiv, Environment == "Copepod")
+```
+
+```{r squish_figure, fig.width=12, fig.height=4}
+color_val <- c("red", "blue")
+richness_plot(physeq, color_val, col = "Environment", meas = c("Observed", "Chao1", "Simpson", "Shannon")) + 
+    geom_boxplot(data=alpha1$data, aes(x=Environment, y=value, color=NULL), alpha=0.1) + 
+    theme(axis.title.x = element_blank())
+```
+
+### T test to determine whether diversity is greater in water or in copepods
+
+```{r ttest}
+# Test whether water diversity is greater than zero
+t.test(adivW$Simpson, adivC$Simpson, alternative="greater")
+```
+
+### Paired water/copepod Figure and t-test
+
+```{r pairedT, fig.width=6, fig.height=4}
+## Plotting the data
+colorCount <- length(levels(sample_data(physeq)$Location))
+color_val <- sample(getPalette(colorCount))
+
+g <- ggplot(adiv, aes(x = Environment, y = Simpson, group = factor(Location)))
+g <- g + geom_line(size = 1, aes(colour = Location)) + 
+        geom_point(size =7, pch = 21, fill = "lightblue", alpha = .5) +
+        scale_colour_manual(values = color_val)
+g
+
+#Paired t-test (paired water/copepod) MUST EXCLUDE MONTMAGNAY AND VE BECAUSE they are unpaired
+t.test(adivW$Shannon, adivC$Shannon, paired=TRUE, alternative="greater")
+```
+
+```{r corplot, fig.width=6, fig.height=4}
+# Plot correlation between water diversity and copepod diversity
+a <- melt(adiv, id.vars=c("Location", "Environment"), 
+          measure.vars=c("Simpson", "Shannon"))
+b <- dcast(a, Location ~ variable + Environment)
+div_corplot <- ggplot(b, aes(Shannon_Copepod, Shannon_Water)) + 
+    geom_point(size=5) + xlab("Copepod Diversity") +
+    ylab("Water Diversity") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_blank())
+div_corplot
+with(b, cor.test(Shannon_Copepod, Shannon_Water))
+
+#Test water vs. water salinity
+adivWsalt <- filter(adivW, WaterType =="Salt")
+adivWfresh <- filter(adivW, WaterType == "Fresh")
+
+print("Test whether diversity in water is affected by salinity")
+t.test(adivWsalt$Shannon, adivWfresh$Shannon, alternative="greater")
+
+# Test copepod diversity by salinity
+adivCsalt <- filter(adivC, WaterType == "Salt")
+adivCfresh <- filter(adivC, WaterType == "Fresh")
+
+print("Test whether diversity in copepods is affected by salinity")
+t.test(adivCsalt$Shannon, adivCfresh$Shannon, alternative="greater")
+
+# Test copepod diversity by clade
+adiv.a.wat <- filter(adiv_all, Environment == "Water")
+adiv.a.cop <- filter(adiv_all, Environment == "Copepod")
+
+
+```
+
+#Alpha Diversity Estimates by Salinity
+
+Plot richness of copepods and water in fresh or salt water. Are there patterns of richness depending on salinity? 
+
+```{r richness_by_habitat, fig.width=6, fig.height=4}
+theme_set(theme_bw())
+color_val <- c("blue", "red")
+
+# Subset data for plotting purposes
+copepods_only <- subset_samples(physeq, Environment=="Copepod")
+water_only <- subset_samples(physeq, Environment=="Water")
+
+t <- "Copepod Associated Samples"
+rplot_cop <- richness_plot(copepods_only, color_val, xval = "WaterType", 
+                           col = "WaterType", title = t)
+p1 <- rplot_cop + geom_boxplot(data=rplot_cop$data, aes(x=WaterType, y=value, color=NULL), 
+                     alpha=0.1) + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=0),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Copepod Samples")
+
+t <- "Water bacteria samples"
+rplot_water <- richness_plot(water_only, color_val,xval = "WaterType", 
+                             col = "WaterType", title = t)
+p2 <- rplot_water + geom_boxplot(data=rplot_water$data, aes(x=WaterType, y=value, color=NULL), 
+                     alpha=0.1) + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=0),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Water Samples")
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+#Alpha Diversity Estimates by Clade
+
+```{r richness_by_clade}
+theme_set(theme_bw())
+color_val <- c("purple3", "red", "forestgreen")
+
+t <- "Copepod Associated Samples"
+rplot_cop <- richness_plot(copepods_only, color_val, xval = "Region", 
+                           col = "Region", title = t)
+p1 <- rplot_cop + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=90),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Copepod Samples")
+
+t <- "Water bacteria samples"
+rplot_water <- richness_plot(water_only, color_val,xval = "Region", 
+                             col = "Region", title = t)
+p2 <- rplot_water + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=90),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Water Samples")
+
+multiplot(p1, p2, cols=2)
+```
+
+#Alpha Diversity Estimates by Continent
+
+```{r richness_by_continent}
+theme_set(theme_bw())
+color_val <- c("dodgerblue3", "goldenrod3")
+
+t <- "Copepod Associated Samples"
+rplot_cop <- richness_plot(copepods_only, color_val, xval = "Continent", 
+                           col = "Continent", title = t)
+p3 <- rplot_cop + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=90),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Copepod Samples")
+
+t <- "Water bacteria samples"
+rplot_water <- richness_plot(water_only, color_val,xval = "Continent", 
+                             col = "Continent", title = t)
+p4 <- rplot_water + theme(axis.title.y = element_text(size=12),
+          axis.title.x = element_blank(),
+          axis.text.x = element_text(size=12, angle=90),
+          strip.text.x = element_text(size = 12),
+          legend.text = element_text(size=10),
+          plot.title = element_text(size=18, face="bold", vjust=2)) + 
+    ggtitle("Water Samples")
+
+multiplot(p3, p4, cols=2)
+```
+
+
+#Alpha Diversity Correlation with Temperature/Latitude
+
+```{r corplot_sup}
+# Plot correlation between water diversity and copepod diversity
+a <- melt(adiv, id.vars=c("Location", "Environment"), 
+          measure.vars=c("Simpson", "Shannon", "Temperature"))
+b <- dcast(a, Location ~ variable + Environment)
+div_corplot <- ggplot(b, aes(Shannon_Copepod, Temperature_Copepod)) + 
+    geom_point(size=5) + xlab("Copepod Microbiome Diversity") +
+    ylab("Water Temperature") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p1 <- div_corplot
+
+div_corplot <- ggplot(b, aes(Shannon_Water, Temperature_Water)) + 
+    geom_point(size=5) + xlab("Water Microbiome Diversity") +
+    ylab("Water Temperature") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p2 <- div_corplot
+
+a <- melt(adiv, id.vars=c("Location", "Environment"), 
+          measure.vars=c("Simpson", "Shannon", "Latitude"))
+b <- dcast(a, Location ~ variable + Environment)
+
+div_corplot <- ggplot(b, aes(Shannon_Copepod, Latitude_Copepod)) + 
+    geom_point(size=5) + xlab("Copepod Microbiome Diversity") +
+    ylab("Latitude") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p3 <- div_corplot
+
+div_corplot <- ggplot(b, aes(Shannon_Water, Latitude_Water)) + 
+    geom_point(size=5) + xlab("Water Microbiome Diversity") +
+    ylab("Latitude") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p4 <- div_corplot
+```
+
+#Does read count affect diversity?
+```{r corplot_rc}
+read_count <- as.data.frame(sample_sums(physeq_unaltered))
+read_count <- cbind(Sample=rownames(read_count), read_count)
+
+#sdata <- sample_data(physeq)
+#sdata <- cbind(Sample=rownames(sdata), sdata)
+metadata <- merge(read_count, adiv, by.x = "Sample", by.y = "Row.names")[,1:11]
+colnames(metadata)[2] <- "ReadCount"
+
+copepods <- filter(metadata, Environment == "Copepod")
+water <- filter(metadata, Environment == "Water")
+
+div_corplot <- ggplot(copepods, aes(Shannon, ReadCount)) + 
+    geom_point(size=5) + xlab("Copepod Microbiome Diversity") +
+    ylab("Initial Read Count") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p5 <- div_corplot
+
+div_corplot <- ggplot(water, aes(Shannon, ReadCount)) + 
+    geom_point(size=5) + xlab("Water Microbiome Diversity") +
+    ylab("Initial Read Count") + theme(axis.title.y = element_text(angle=90)) +
+    geom_smooth(method=lm, fill = "lavenderblush3") + 
+    theme(axis.title.y = element_text(size=14),
+          axis.title.x = element_text(size=14),
+          plot.title = element_blank())
+p6 <- div_corplot
+
+
+multiplot(p1, p2, p3, p4, p5, p6, cols=2)
+```

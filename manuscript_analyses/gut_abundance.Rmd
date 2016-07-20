@@ -1,0 +1,273 @@
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_gut_abundance/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(ape)
+library(plyr)
+library(knitr)
+
+set.seed(9373399)
+#setwd("Projects/16S_Eaffinis/Analyses/2015-11-23_UPARSE/")
+
+otuTable <- read.csv("data/gut_otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/gut_taxa.csv", quote = '"')
+sampleData <- read.csv("data/gut_sampleData.csv")
+tree <- read.tree("data/gut_tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+## Standardize abundances by relative abundance:
+physeq_relative <- transform_sample_counts(physeq, function(x) x / sum(x))
+
+rm(taxmat, sampleData, otuTable, taxTable, tree)
+```
+
+
+```{r ggplottheme}
+# ## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+```
+
+#Abundance Bar Plots
+
+
+I have transformed the data by relative abundance. I am plotting only the most abundance phyla and the composition of the phyla.
+
+## Abundance by Phylum
+
+``` {r abundance_phylum}
+theme_set(theme_bw())
+
+# Plotting function. Feed in a phyloseq object and a color value object
+comparison_plot <- function(matr, color_val, label = "Sample", fill = "Phylum", 
+                            title = "Abundance by Phylum"){
+    aa <- psmelt(matr)
+    .e <- environment()
+    
+    p <- ggplot(aa, aes_string(x = label, y = "Abundance", fill = fill), environment = .e) +
+    geom_bar(aes(order=desc(aa[,fill])),
+                     stat = "identity", 
+                     position = "stack", 
+                     color = "black") +
+    scale_fill_manual(values = color_val) +
+    guides(fill=guide_legend(ncol=2)) +
+    ggtitle(title) +
+    theme(axis.title.y = element_text(angle=90, size=20),
+          axis.title.x = element_text(size=20),
+          axis.text.x = element_text(angle = 90, hjust=0, vjust=0.5, size=18),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+    
+    return(p)
+}
+
+# I only look at the top 10 phyla
+physeq_glom <- tax_glom(physeq, "Phylum")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:10]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Phylum))
+color_val <- sample(getPalette(colorCount))
+
+comparison_plot(a, color_val, label = "Code", title = "Abundance by Phylum")
+
+```
+
+## Abundance by Class
+
+```{r abundance_class}
+# I only look at the top 20 Classes
+physeq_glom <- tax_glom(physeq, "Class")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:20]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Class))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+gut <- subset_samples(a, Environment=="Gut")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", title = "Abundance by Class in Copepods", 
+                fill = "Class")
+comparison_plot(gut, color_val, label = "Code", title = "Abundance by Class in Guts", 
+                fill = "Class")
+```
+
+
+## Abundance by Family
+
+```{r abundance_family}
+# I only look at the top 32 taxa
+physeq_glom <- tax_glom(physeq, "Family")
+physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:32]), 
+                physeq_rel_glom)
+colorCount <- length(levels(as.data.frame(tax_table(a))$Family))
+color_val <- sample(getPalette(colorCount))
+
+# Subset samples for plotting
+cop <- subset_samples(a, Environment=="Copepod")
+gut <- subset_samples(a, Environment=="Gut")
+
+#Plotting (to get the bar order consistent)
+comparison_plot(cop, color_val, label = "Code", title = "Abundance by Family in Copepods", 
+                fill = "Family")
+comparison_plot(gut, color_val, label = "Code", title = "Abundance by Family in Guts", 
+                fill = "Family")
+```
+
+# Alpha Diversity Plots
+
+The first step is to understand within-sample diversity and how it differs between samples. Which samples have the largest diversity? Which have the lowest? Are there patterns? We are unsure of what to expect regarding whether water, gut, or copepod samples have the lowest diversity. Althouogh we do expect copepod gut samples to be equally or less diverse that whole animal samples, since the guts should be a subset of the whole animal.
+
+```{r richness_by_env}
+theme_set(theme_bw())
+colorCount <- length(levels(sample_data(physeq)$Location))
+color_val <- sample(getPalette(colorCount))
+
+physeq <- rarefy_even_depth(physeq)
+
+# Plotting function:
+richness_plot <- function(phy, color_val, xval = "Environment", col = "Location", meas = c("Simpson", "Shannon"), title = "Alpha Diversity"){
+    
+    p <- plot_richness(phy, x = xval, color = col, measures = meas) + 
+        scale_colour_manual(values = color_val) +
+        geom_point(size = 5, alpha = 1.0) + 
+        theme(axis.title.y = element_text(angle=90, size=20),
+              axis.title.x = element_text(size=20),
+              axis.text.x = element_text(size=16),
+              legend.text = element_text(size=14),
+              plot.title = element_text(size=24, face="bold", vjust=2)) + 
+        ggtitle(title) + ylab("Diversity")
+    
+    return(p)
+}
+
+#Plot alpha diversity estimates across samples
+alpha1 <- richness_plot(physeq, color_val, meas = c("Observed", "Chao1", "Simpson", "Shannon", "ACE"))
+alpha1
+
+
+color_val <- c("red", "blue")
+richness_plot(physeq, color_val, col = "Environment", meas = c("Observed", "Chao1", "Simpson", "Shannon", "ACE")) + 
+    geom_boxplot(data=alpha1$data, aes(x=Environment, y=value, color=NULL), alpha=0.1)
+```
+
+
+## Venn Diagrams
+
+```{r venn}
+library(limma)
+library(dplyr)
+a <- otu_table(physeq)
+b <- tax_table(physeq)
+b <- as.data.frame(b)
+a <- as.data.frame(a)
+a <- as.data.frame(t(a))
+
+attach(a)
+loe  <- (LOE >= 1)
+logun <- (LOGUN >=1)
+ve <- (VE >= 1)
+vg <- (VG >= 1)
+
+c <- merge(a, b, by="row.names")
+c <- mutate(c, total = LOE + LOGUN + VE + VG)
+c <- arrange(c, desc(total))
+
+venn_data <- cbind(loe, logun, ve, vg)
+venn_data <- vennCounts(venn_data)
+vennDiagram(venn_data)
+
+guts <- cbind(logun, vg)
+venn_counts <- vennCounts(guts)
+vennDiagram(venn_counts)
+
+lv <- cbind(ve, vg)
+venn_counts <- vennCounts(lv)
+vennDiagram(venn_counts)
+
+lv <- cbind(loe, logun)
+venn_counts <- vennCounts(lv)
+vennDiagram(venn_counts)
+
+```
+
+## Taxa shared between all guts and whole animal
+
+```{r shared_all}
+all <- filter(c, LOE >=1, LOGUN >= 1, VE >= 1, VG >= 1)
+kable(all[,2:ncol(all)])
+```
+
+## Taxa shared between guts (may be in whole animal too)
+
+```{r shared_guts}
+gut <- filter(c, LOGUN>=1, VG>=1)
+kable(gut[,2:ncol(gut)])
+```
+
+## Taxa shared between guts (only guts)
+
+```{r shared_only_guts}
+only_gut <- filter(c, LOGUN>=1, VG>=1, LOE==0, VE==0)
+kable(only_gut[,2:ncol(only_gut)])
+```
+
+# Gut but not ONLY in the gut
+
+```{r shared_guts_something_else}
+x <- merge(gut, only_gut, by="Row.names")
+y <- x$Row.names
+z <- filter(gut, !(Row.names %in% y))
+kable(z[,2:ncol(z)])
+```
+
+## Taxa shared between L'isle Verte 
+
+```{r shared_ve}
+veshare <- filter(c, LOE==0, LOGUN==0, VE >= 1, VG >= 1)
+kable(veshare[,2:ncol(veshare)])
+```
+
+## Taxa shared between Louisville
+
+```{r shared_lo}
+loshare <- filter(c, LOE>=1, LOGUN>=1, VE == 0, VG == 0)
+kable(loshare[,2:ncol(loshare)])
+```

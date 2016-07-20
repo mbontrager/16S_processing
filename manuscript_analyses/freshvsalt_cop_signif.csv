@@ -1,0 +1,5 @@
+"","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj","Kingdom","Phylum","Class","Order","Family","Genus","Species"
+"OTU_8",231.130112003021,-7.64716583483932,1.77218598421449,-4.31510343889153,1.59528187286664e-05,0.0248385387605336,"Bacteria","Bacteroidetes","Saprospirae","Saprospirales","Saprospiraceae","unclassified","unclassified"
+"OTU_16",186.962701604077,8.06287685287037,2.08334085831274,3.87016691037315,0.000108760864529252,0.0490682280246214,"Bacteria","Proteobacteria","Alphaproteobacteria","Rhodobacterales","Rhodobacteraceae","unclassified","unclassified"
+"OTU_36839",33.0071093361702,7.90046823690283,2.00112705575242,3.94800930515242,7.88037423635456e-05,0.0490682280246214,"Bacteria","Proteobacteria","Alphaproteobacteria","Rhodobacterales","Rhodobacteraceae","unclassified","unclassified"
+"OTU_11",142.165957379166,7.99365209990577,2.08491912503758,3.83403461741553,0.000126058389273273,0.0490682280246214,"Bacteria","Proteobacteria","Alphaproteobacteria","Rhodobacterales","Rhodobacteraceae","unclassified","unclassified"

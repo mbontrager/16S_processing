@@ -1,0 +1,627 @@
+#E affinis 16S analysis
+### Martin Bontrager
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_betaDiv_relative/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(DESeq2)
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(tidyr)
+library(ape)
+library(dplyr)
+library(reshape2)
+library(knitr)
+
+set.seed(9373399)
+
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+## Variance Stabilized sample counts with DESeq2 (per "waste not, want not" paper)
+pseq_deseq <- phyloseq_to_deseq2(physeq, ~Environment)
+
+# calculate geometric means prior to estimate size factors
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans <- apply(counts(pseq_deseq), 1, gm_mean)
+
+#Dispersion Estimates in DESeq2
+pseq_vst <- estimateSizeFactors(pseq_deseq, geoMeans = geoMeans)
+pseq_vst <- estimateDispersions(pseq_vst)
+pseq_vst <- getVarianceStabilizedData(pseq_vst)
+pseq_vst[pseq_vst < 0] <- 0
+
+otu_table(physeq) <- otu_table(pseq_vst, taxa_are_rows = TRUE)
+
+rm(pseq_vst, geoMeans, pseq_deseq, sampleData, taxmat, otuTable, taxTable, tree)
+```
+
+
+```{r ggplottheme}
+# ## ggplot theming
+theme_set(theme_bw())
+pal = "Set1"
+scale_colour_discrete <- function(palname = pal, ...) {
+        scale_colour_brewer(palette = palname, ...)
+}
+
+scale_fill_discrete <- function(palname = pal, ...) {
+        scale_fill_brewer(palette = palname, ...)
+}
+
+getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
+
+# Plot title size, etc.
+fontsize = 18L
+theme_update(axis.title.x = element_text(size=fontsize))
+theme_update(axis.title.y = element_text(size=fontsize))
+theme_update(plot.title = element_text(size=fontsize+2))
+```
+
+# Beta diversity analyses
+
+Since I have a phylogenetic tree for these data, I can use unifrac weighted and unweighted distance metrics which will be really great. (Unifrac and dpcoa).
+
+First, here are some results from canonical correspondence analysis:
+
+```{r CCA}
+cca <- ordinate(physeq, "CCA")
+colorCount = length(levels(sample_data(physeq)$Location))
+plot_ordination(physeq, cca, color="Location", shape="Environment") + 
+    geom_line() + geom_point(size=5) + 
+    scale_color_manual(values = getPalette(colorCount))
+
+```
+
+It's best to look at a subset of these instead of all the distance matrices. Here are the PCoA ordination plots for Jaccard (Presence/absence only), Bray-Curtis (abundance-based), and Jenson-Shannon distances:
+
+```{r distance_methods}
+theme_set(theme_bw())
+colorCount = length(levels(sample_data(physeq)$Location))
+
+c.jaccard <- ordinate(physeq, "PCoA", "jaccard")
+c.bray <- ordinate(physeq, "PCoA", "bray")
+c.jsd <- ordinate(physeq, "PCoA", "jsd")
+plot_ordination(physeq, c.jaccard, color = "Location", shape = "Environment") +
+    ggtitle(paste("PCoA w/ jaccard Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.jaccard, color = "WaterType", 
+                shape = "Environment") +
+    ggtitle(paste("PCoA w/ jaccard Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.bray, color = "Location", shape = "Environment") +
+    ggtitle(paste("PCoA w/ Bray-Curtis Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.bray, axes = c(3, 4), color = "Location", 
+                shape = "Environment") +
+    ggtitle(paste("PCoA w/ Bray-Curtis Distance on axis 3, 4")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.jsd, color = "Location", shape = "Environment") +
+    ggtitle(paste("PCoA w/ jsd Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.jsd, axes = c(3, 4), color = "Location", 
+                shape = "Environment") +
+    ggtitle(paste("PCoA w/ jsd Distance on axis 3, 4")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+```
+
+# Here are those same distances plotted with NMDS ordination
+
+```{r NMDS}
+c.jaccard <- ordinate(physeq, "NMDS", "jaccard")
+c.bray <- ordinate(physeq, "NMDS", "bray")
+c.jsd <- ordinate(physeq, "NMDS", "jsd")
+plot_ordination(physeq, c.jaccard, color = "Location", shape = "Environment") +
+    ggtitle(paste("NMDS w/ jaccard Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.bray, color = "Location", shape = "Environment") +
+    ggtitle(paste("NMDS w/ Bray-Curtis Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.bray, color = "WaterType", shape = "Environment") +
+    ggtitle(paste("NMDS w/ Bray-Curtis Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.jsd, color = "Location", shape = "Environment") +
+    ggtitle(paste("NMDS w/ jsd Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+plot_ordination(physeq, c.jsd, color = "WaterType", shape = "Environment") +
+    ggtitle(paste("NMDS w/ jsd Distance")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+```
+
+# UniFrac Distances
+
+This method relies on the calculation of distances via shared phylogenetic branch-length between samples on a phylogenetic tree. Shown below are weighted UniFrac distances (abundance is considered)
+
+
+```{r unifrac}
+theme_set(theme_bw())
+# Find color count (sample location)
+colorCount = length(levels(sample_data(physeq)$Location))
+#Unifrac weighted distance
+unifrac_weighted <- UniFrac(physeq, weighted = TRUE)
+# Ordinate
+iMDS  <- ordinate(physeq, "NMDS", distance=unifrac_weighted)
+plot_ordination(physeq, iMDS, color="Location", shape = "Environment") +
+    ggtitle(paste("NMDS w/ UNIFRAC weighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+#Plot Unifrac with hostxwater colors,
+plot_ordination(physeq, iMDS, color="HostxWater") +
+    ggtitle(paste("NMDS w/ UNIFRAC weighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=c("#E41A1C", "#984EA3", "#377EB8", "#4DAF4A")) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+iMDS  <- ordinate(physeq, "PCoA", distance=unifrac_weighted)
+colorCount = length(levels(sample_data(physeq)$Location))
+
+#Plot Unifrac with regionxwater colors,
+plot_ordination(physeq, iMDS, color="Location", shape="Environment") +
+    ggtitle(paste("PCoA w/ UNIFRAC weighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+#UniFrac Unweighted
+
+Generally speaking I prefer to use unweighted Unifrac, which calculates distance based solely on presence/absence rather than overall abundance. They are both probably good measures, I just feel like 16S amplification bias and other sample prep/extraction issues might confuse the weighted.
+
+```{r ordination_plot_unifrac_un}
+theme_set(theme_bw())
+colorCount = length(levels(sample_data(physeq)$Location))
+
+#Unifrac unweighted distance
+unifrac_unweighted <- UniFrac(physeq, weighted = FALSE)
+# Ordinate
+iMDS  <- ordinate(physeq, "NMDS", distance=unifrac_unweighted)
+
+#Unifrac unweighted plot
+plot_ordination(physeq, iMDS, color="Environment") +
+    ggtitle(paste("NMDS w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+#Plot Unifrac with hostxwater colors,
+plot_ordination(physeq, iMDS, color="HostxWater") +
+    ggtitle(paste("NMDS w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=c("#E41A1C", "#984EA3", "#377EB8", "#4DAF4A")) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+# PCoA plots
+
+iMDS  <- ordinate(physeq, "PCoA", distance=unifrac_unweighted)
+
+#Plot Unifrac with hostxwater colors,
+plot_ordination(physeq, iMDS, color="HostxWater") +
+    ggtitle(paste("PCoA w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=c("#E41A1C", "#984EA3", "#377EB8", "#4DAF4A")) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+# Distance testing (ANISOM)
+##Unifrac Unweighted
+
+I want to test the clustering of the points based on treatment. This can be done using the vegan package and it is explained very well at this link: http://joey711.github.io/phyloseq-demo/Restroom-Biogeography
+
+```{r anisom}
+library("vegan")
+packageVersion("vegan")
+
+phywat_cop <- subset_samples(physeq, Environment != "Gut")
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE)
+
+
+print("Is the Environment (Host vs. Water) a significant factor?")
+env_test <- get_variable(phywat_cop, "Environment")
+env_ano <- anosim(unifrac_unweighted, env_test)
+env_ano$signif
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(unifrac_unweighted, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+```
+
+## Jaccard distances
+
+```{r anisom_jaccard}
+phywat_cop <- subset_samples(physeq, Environment != "Gut")
+dist <- distance(phywat_cop, method = "jaccard")
+
+print("Is the Environment (Host vs. Water) a significant factor?")
+env_test <- get_variable(phywat_cop, "Environment")
+env_ano <- anosim(dist, env_test)
+env_ano$signif
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(dist, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+```
+
+## Bray-Curtis distances
+
+```{r anisom_bray}
+phywat_cop <- subset_samples(physeq, Environment != "Gut")
+dist <- distance(phywat_cop, method = "bray")
+
+print("Is the Environment (Host vs. Water) a significant factor?")
+env_test <- get_variable(phywat_cop, "Environment")
+env_ano <- anosim(dist, env_test)
+env_ano$signif
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(dist, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(dist, hxw_test)
+hxw_ano$signif
+```
+
+# Copepod only samples
+
+##Unifrac weighted
+
+```{r unifrac_ngnw}
+theme_set(theme_bw())
+# Find color count (sample location)
+ngnw <- subset_samples(physeq, Environment != "Water")
+colorCount = length(levels(sample_data(ngnw)$Location))
+#Unifrac weighted distance
+unifrac_weighted <- UniFrac(ngnw, weighted = TRUE)
+# Ordinate
+iMDS  <- ordinate(ngnw, "PCoA", distance=unifrac_weighted)
+plot_ordination(ngnw, iMDS, color="Location", shape = "WaterType") +
+    ggtitle(paste("PCoA w/ UNIFRAC weighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+#Plot Unifrac with hostxwater colors,
+plot_ordination(ngnw, iMDS, color="HostxWater") +
+    ggtitle(paste("PCoA w/ UNIFRAC weighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=c("#E41A1C", "#984EA3", "#377EB8", "#4DAF4A")) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+# Plot on the 3,4 MDS axis
+plot_ordination(ngnw, iMDS, axes = c(3, 4), color="Location") + 
+    ggtitle(paste("PCoA w/ UNIFRAC unweighted on axes 3,4")) +
+    geom_point(size = 6, alpha = 0.9) + 
+        scale_color_manual(values = getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+#Unweighted UniFrac
+
+```{r jaccard_cop}
+colorCount = length(levels(sample_data(ngnw)$Location))
+#Jaccard distance
+meas <- distance(ngnw, method = "jaccard")
+# Ordinate
+iMDS  <- ordinate(ngnw, "PCoA", distance=meas)
+
+plot_ordination(ngnw, iMDS, color = "WaterType", 
+                shape = "Environment") +
+    ggtitle(paste("PCoA w/ jaccard Distance (Copepods Only)")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values = getPalette(colorCount))
+
+```
+
+```{r ordination_plot_unifrac_un_PCOA}
+theme_set(theme_bw())
+colorCount = length(levels(sample_data(ngnw)$Location))
+
+#Unifrac unweighted distance
+unifrac_unweighted <- UniFrac(ngnw, weighted = FALSE)
+# Ordinate
+iMDS  <- ordinate(ngnw, "PCoA", distance=unifrac_unweighted)
+
+#Unifrac unweighted plot
+plot_ordination(ngnw, iMDS, color="WaterType") +
+    ggtitle(paste("PCoA w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount))
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+colorCount = length(levels(as.factor(sample_data(ngnw)$RegionxWater)))
+    
+#Plot Unifrac with hostxwater colors,
+plot_ordination(ngnw, iMDS, color="RegionxWater") +
+    ggtitle(paste("PCoA w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+# Plot on the 3,4 MDS axis
+plot_ordination(ngnw, iMDS, axes = c(3, 4), color="RegionxWater") + 
+    ggtitle(paste("PCoA w/ UNIFRAC unweighted on axes 2,3")) +
+    geom_point(size = 6, alpha = 0.9) + 
+        scale_color_manual(values = getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+#Unweighted UniFrac (NMDS)
+
+```{r ordination_plot_unifrac_un_NMDS}
+theme_set(theme_bw())
+colorCount = length(levels(sample_data(ngnw)$Location))
+
+#Unifrac unweighted distance
+unifrac_unweighted <- UniFrac(ngnw, weighted = FALSE)
+# Ordinate
+iMDS  <- ordinate(ngnw, "NMDS", distance=unifrac_unweighted)
+
+#Unifrac unweighted plot
+plot_ordination(ngnw, iMDS, color="Location") +
+    ggtitle(paste("NMDS w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount))
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+    
+#Plot Unifrac with hostxwater colors,
+plot_ordination(ngnw, iMDS, color="WaterType") +
+    ggtitle(paste("NMDS w/ UNIFRAC unweighted")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+# Distance testing (ANISOM)
+##Unifrac unweighted testing (copepods only)
+
+```{r anisom_ngnw}
+phywat_cop <- ngnw
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE)
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(unifrac_unweighted, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(unifrac_unweighted, hxw_test)
+hxw_ano$signif
+```
+
+## Jaccard testing (copepods only)
+
+```{r anisom_cop_jaccard}
+phywat_cop <- ngnw
+meas <- distance(phywat_cop, method = "jaccard")
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(meas, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+```
+
+## Bray-Curtis testing (copepods only)
+
+```{r ordination_plot_bray}
+theme_set(theme_bw())
+colorCount = length(levels(sample_data(ngnw)$Location))
+
+# Bray-curtis distance
+meas <- distance(phywat_cop, method = "bray")
+
+# Ordinate
+iMDS  <- ordinate(ngnw, "NMDS", distance=meas)
+
+# Bray-Curtis plot
+plot_ordination(ngnw, iMDS, color="Location") +
+    ggtitle(paste("NMDS w/ Bray-curtis (copepods only)")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount))
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+
+    
+#Plot Bray-Curtis with WaterType colors
+plot_ordination(ngnw, iMDS, color="WaterType") +
+    ggtitle(paste("NMDS w/ Bray-curtis (copepods only)")) +
+    geom_point(size = 6, alpha = 0.9) +
+    scale_color_manual(values=getPalette(colorCount)) +
+    theme(axis.title.y = element_text(size=20),
+          axis.title.x = element_text(size=20),
+          plot.title = element_text(size=24, face="bold", vjust=2))
+```
+
+```{r anisom_cop_bray}
+phywat_cop <- ngnw
+meas <- distance(phywat_cop, method = "bray")
+
+print("Is salinity (Salt vs. Fresh) as significant factor?")
+sal_test <- get_variable(phywat_cop, "WaterType")
+sal_ano <- anosim(meas, sal_test)
+sal_ano$signif
+
+print("Is Clade an important factor?")
+hxw_test <- get_variable(phywat_cop, "Region")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Latitude an important factor?")
+hxw_test <- get_variable(phywat_cop, "Latitude")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Continent an important factor?")
+hxw_test <- get_variable(phywat_cop, "Continent")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+
+print("Is Salinity an important factor?")
+hxw_test <- get_variable(phywat_cop, "Salinity")
+hxw_ano <- anosim(meas, hxw_test)
+hxw_ano$signif
+```
