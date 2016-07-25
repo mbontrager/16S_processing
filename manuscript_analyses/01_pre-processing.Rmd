@@ -24,7 +24,7 @@ library(dplyr)
 library(reshape2)
 library(knitr)
 
-set.seed(5048)
+set.seed(9373399)
 #Change the following to true if you need a .csv output table.
 output_table = TRUE
 
@@ -65,12 +65,12 @@ sampleData <- read.csv("data/16S_metadata.csv", header = TRUE, row.names = 1)
 sample_data(physeq) <- sample_data(sampleData)
 sample_data(physeq)$HostxWater <- paste(sample_data(physeq)$Environment, 
                                         sample_data(physeq)$WaterType)
-sample_data(physeq)$RegionxWater <- paste(sample_data(physeq)$Region, 
+sample_data(physeq)$CladexWater <- paste(sample_data(physeq)$Clade, 
                                           sample_data(physeq)$WaterType)
 sample_data(physeq)$LatitudexWater <- paste(sample_data(physeq)$Latitude, 
                                           sample_data(physeq)$WaterType)
-sample_data(physeq)$RegionxHost <- paste(sample_data(physeq)$Environment, 
-                                          sample_data(physeq)$Region)
+sample_data(physeq)$CladexHost <- paste(sample_data(physeq)$Environment, 
+                                          sample_data(physeq)$Clade)
 
 # Read tree file
 fasttree <- read.tree("data/ParsedFastTree2.tre")

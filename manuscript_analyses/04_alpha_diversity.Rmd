@@ -20,7 +20,7 @@ library(knitr)
 library(gridExtra)
 library(grid)
 
-set.seed(3399)
+set.seed(9373399)
 
 otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
 taxTable <- read.csv("data/taxa.csv", quote = '"')
@@ -249,8 +249,8 @@ theme_set(theme_bw())
 color_val <- c("purple3", "red", "forestgreen")
 
 t <- "Copepod Associated Samples"
-rplot_cop <- richness_plot(copepods_only, color_val, xval = "Region", 
-                           col = "Region", title = t)
+rplot_cop <- richness_plot(copepods_only, color_val, xval = "Clade", 
+                           col = "Clade", title = t)
 p1 <- rplot_cop + theme(axis.title.y = element_text(size=12),
           axis.title.x = element_blank(),
           axis.text.x = element_blank(),
@@ -260,8 +260,8 @@ p1 <- rplot_cop + theme(axis.title.y = element_text(size=12),
 #    ggtitle("Copepod Samples")
 
 t <- "Water bacteria samples"
-rplot_water <- richness_plot(water_only, color_val,xval = "Region", 
-                             col = "Region", title = t)
+rplot_water <- richness_plot(water_only, color_val,xval = "Clade", 
+                             col = "Clade", title = t)
 p2 <- rplot_water + theme(axis.title.y = element_text(size=12),
           axis.title.x = element_blank(),
           axis.text.x = element_blank(),

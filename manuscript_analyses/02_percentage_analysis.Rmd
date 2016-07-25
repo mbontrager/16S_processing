@@ -14,6 +14,7 @@ In this document I explore the percent composition of different microbiome sampl
 ```{r input, echo=FALSE}
 library(dplyr)
 library(reshape2)
+set.seed(9373399)
 
 water <- c("BBW", "BRW", "CBW", "EUW", "FRW", "IJW", "LOW", "MAW", "MMW", "POW", "RMW", "SCW", "TXW", "VIW")
 copepod <- c("BRE", "BBE", "CBE", "EUE", "FRE", "IJE", "LOE", "MAE", "MME", "POE", "RME", "SCE", "TXE", "VIE")

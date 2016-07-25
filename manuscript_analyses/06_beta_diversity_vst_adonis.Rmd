@@ -1,0 +1,146 @@
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_betaDiv_relative/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r read_data}
+library(DESeq2)
+library(phyloseq)
+library(RColorBrewer)
+library(ggplot2)
+library(tidyr)
+library(ape)
+library(dplyr)
+library(reshape2)
+library(knitr)
+
+set.seed(9373399)
+
+# Import data
+otuTable <- read.csv("data/otus.csv", header = TRUE, row.names = 1)
+taxTable <- read.csv("data/taxa.csv", quote = '"')
+sampleData <- read.csv("data/sampleData.csv")
+tree <- read.tree("data/tree.tre")
+rownames(sampleData) <- sampleData[, 1]
+sampleData <- sampleData[, -1]
+taxmat <- as.matrix(taxTable)
+rownames(taxmat) <- taxmat[, 1]
+taxmat <- taxmat[, -1]
+
+otuTable <- otu_table(otuTable, taxa_are_rows = FALSE)
+taxTable <- tax_table(taxmat)
+physeq <- phyloseq(otuTable, taxTable, tree)
+sample_data(physeq) <- sampleData
+
+## Variance Stabilized sample counts with DESeq2 (per "waste not, want not" paper)
+pseq_deseq <- phyloseq_to_deseq2(physeq, ~ Environment)
+
+# calculate geometric means prior to estimate size factors
+gm_mean = function(x, na.rm=TRUE){
+  exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x))
+}
+geoMeans <- apply(counts(pseq_deseq), 1, gm_mean)
+
+#Dispersion Estimates in DESeq2
+pseq_vst <- estimateSizeFactors(pseq_deseq, geoMeans = geoMeans)
+pseq_vst <- estimateDispersions(pseq_vst)
+pseq_vst <- getVarianceStabilizedData(pseq_vst)
+pseq_vst[pseq_vst < 0] <- 0
+
+otu_table(physeq) <- otu_table(pseq_vst, taxa_are_rows = TRUE)
+
+rm(pseq_vst, geoMeans, pseq_deseq, sampleData, taxmat, otuTable, taxTable, tree)
+```
+
+# Distance testing (perMANOVA (adonis))
+# Unifrac Unweighted on all samples (copepods and water)
+
+I want to test the clustering of the points based on treatment. This can be done using the implementation of perMANOVA in the 'adonis' function from the vegan package
+
+### Is the Environment (Host vs. Water) a significant factor?
+
+```{r adonis_env}
+library("vegan")
+packageVersion("vegan")
+
+phywat_cop <- physeq
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE) 
+df <- data.frame(sample_data(phywat_cop))
+
+adonis(unifrac_unweighted ~ Environment, data=df)
+```
+
+
+### Is the salinty (saline vs. fresh) a factor for ALL samples (copepod and water)?
+
+```{r adonis_all_sal}
+adonis(unifrac_unweighted ~ WaterType, data=df)
+```
+
+---
+
+# Copepod only samples
+##Unifrac unweighted testing
+
+```{r adonis_cop}
+phywat_cop <- subset_samples(physeq, Environment != "Water")
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE)
+df <- data.frame(sample_data(phywat_cop))
+```
+
+### Is salinity (Salt vs. Fresh) as significant factor?
+
+```{r adonis_cop_salt}
+sal <- adonis(unifrac_unweighted ~ WaterType, data=df)
+sal
+```
+
+### Is Clade an important factor?
+
+```{r adonis_cop_clade}
+clade <- adonis(unifrac_unweighted ~ Clade, data=df)
+clade
+```
+
+### Is latitude an important factor?
+
+```{r adonis_cop_lat}
+lat <- adonis(unifrac_unweighted ~ Latitude, data=df)
+lat
+```
+
+### Is Temperature an important factor?
+
+```{r adonis_cop_temp}
+phywat_cop <- subset_samples(phywat_cop, Location != "Montmagnay")
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE)
+df <- data.frame(sample_data(phywat_cop))
+temp <- adonis(unifrac_unweighted ~ Temperature, data=df)
+temp
+```
+
+
+Based on the previous tests, it seems obvious that there is a salinity (fresh v. salt) effect. Other environmental factors are not so clear. It seems that there could be an effect of latitude on community composition. However there are a lot of confounding factors, including the fact that clade covaries with latitude. I'm also doing a lot of multiple testing. I'll adjust these p-values to the multiple tests that I performed:
+
+```{r adonis_multest}
+pvals <- c(sal$aov.tab$`Pr(>F)`[1], clade$aov.tab$`Pr(>F)`[1],
+           lat$aov.tab$`Pr(>F)`[1], temp$aov.tab$`Pr(>F)`[1])
+p.adjust(pvals, method = "holm")
+```
+
+Which is to say that salinity [1], remains a factor after correcting for multiple inferences, but none of the other factors (clade, latitude, temperature; [2:4]) do.
+
+# Water only samples
+##Unifrac unweighted testing
+
+```{r adonis_wat}
+phywat_cop <- subset_samples(physeq, Environment != "Copepod")
+unifrac_unweighted <- UniFrac(phywat_cop, weighted=FALSE)
+df <- data.frame(sample_data(phywat_cop))
+```
+
+### Is salinity (Salt vs. Fresh) as significant factor?
+
+```{r adonis_wat_salt}
+adonis(unifrac_unweighted ~ WaterType, data=df)
+```
