@@ -4,9 +4,10 @@ output: html_document
 #E affinis 16S analysis
 ### Martin Bontrager
 
+## DON'T RUN THIS AS RMARKDOWN. DOESN"T WORK"
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs_diversity_all/',
-                      echo=FALSE, warning=FALSE, message=FALSE, cache = TRUE)
+                      echo=FALSE, warning=FALSE, message=FALSE)
 ```
 
 ```{r read_data}
@@ -54,12 +55,6 @@ scale_fill_discrete <- function(palname = pal, ...) {
 }
 
 getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
-
-# Plot title size, etc.
-fontsize = 18L
-theme_update(axis.title.x = element_text(size=fontsize))
-theme_update(axis.title.y = element_text(size=fontsize))
-theme_update(plot.title = element_text(size=fontsize+2))
 ```
 
 # Rarefaction Curves
@@ -119,7 +114,7 @@ rarefaction_curve_data_summary_verbose_wat <- filter(rarefaction_curve_data_summ
 
 
 ```{r rare_plots, fig.width=12, fig.height=8}
-pdf("figS2-Copepod_rarefaction", width = 12, height = 8)
+pdf("figS2-Copepod_rarefaction.pdf", width = 12, height = 8)
 ggplot(
   data = rarefaction_curve_data_summary_verbose_cop,
   mapping = aes(

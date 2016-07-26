@@ -148,7 +148,7 @@ None
 # , i.e. which taxa are distinct between invasions
 # Subset data for plotting purposes
 copepods_only <- subset_samples(physeq_1, Environment=="Copepod")
-copepods_only <- subset_samples(copepods_only, Region=="South")
+copepods_only <- subset_samples(copepods_only, Clade=="Gulf")
 
 copdds <- phyloseq_to_deseq2(copepods_only, ~ WaterType)
 geoMeans <- apply(counts(copdds), 1, gm_mean)
@@ -178,7 +178,7 @@ kable(head(negsigtab, 30))
 # , i.e. which taxa are distinct between invasions
 # Subset data for plotting purposes
 copepods_only <- subset_samples(physeq_1, Environment=="Copepod")
-copepods_only <- subset_samples(copepods_only, Region=="Europe")
+copepods_only <- subset_samples(copepods_only, Clade=="European")
 
 copdds <- phyloseq_to_deseq2(copepods_only, ~ WaterType)
 geoMeans <- apply(counts(copdds), 1, gm_mean)
