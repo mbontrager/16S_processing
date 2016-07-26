@@ -60,7 +60,9 @@ getPalette <- colorRampPalette(brewer.pal(9, "Set1"))
 
 I want to know which taxa are responsible for the major differences between copepods and water. I will do that with validation and FDR correction. Taxa that are significantly different between water/copepods samples:
 
-```{r mul}
+### More abundant in Water:
+
+```{r water_enriched}
 # Following a procedure online, convert phyloseq to DESeq object
 # Perform analyses on "Environment", i.e. which taxa separate copepods and water
 library(DESeq2)
@@ -89,17 +91,17 @@ write.csv(sigtab, "watervcopepod_signif.csv")
 posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
 # Negative log fold changes mean abundance in copepods
 negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
-print("Taxa that are more abundant in water:")
-#kable(head(posigtab, 30))
-print("\n\nTaxa that are more abundant in copepods:")
-#kable(head(negsigtab, 30))
 
 drops <- c("baseMean", "lfcSE", "stat", "pvalue", "Kingdom")
 waterbact <- posigtab[ , !(names(posigtab) %in% drops)]
 rownames(waterbact) <- NULL
 waterbact <- waterbact[c("Phylum", "Class", "Order", "Family", "Genus", "Species", "log2FoldChange", "padj")]
 kable(waterbact)
+```
 
+### More abundant in copepods:
+
+```{r cop_enriched}
 copbact <- negsigtab[ , !(names(negsigtab) %in% drops)]
 rownames(copbact) <- NULL
 copbact <- copbact[c("Phylum", "Class", "Order", "Family", "Genus", "Species", "log2FoldChange", "padj")]
@@ -150,6 +152,7 @@ write.csv(sigtab, "freshvsalt_cop_signif.csv")
 
 posigtab <- sigtab[sigtab[, "log2FoldChange"] > 0, ]
 negsigtab <- sigtab[sigtab[, "log2FoldChange"] < 0, ]
+
 kable(head(posigtab, 30))
 kable(head(negsigtab, 30))
 
@@ -180,7 +183,7 @@ ggplot(sigtabgen, aes(x=Genus, y=log2FoldChange, color=Family)) +
 #Are there taxa which are only/over-represented in Red clade samples?
 #Subset data for plotting purposes
 copepods_only <- subset_samples(physeq, Environment=="Copepod")
-sample_data(copepods_only)$red <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod Northeast", TRUE, FALSE))
+sample_data(copepods_only)$red <- as.factor(ifelse(sample_data(copepods_only)$CladexHost == "Copepod Atlantic", TRUE, FALSE))
 
 copdds <- phyloseq_to_deseq2(copepods_only, ~ red)
 geoMeans <- apply(counts(copdds), 1, gm_mean)
@@ -209,7 +212,7 @@ This shows that there is a taxa labeled as an endosymbiont of Deronectes Platyno
 #Are there taxa which are only/over-represented in Red clade samples?
 #Subset data for plotting purposes
 copepods_only <- subset_samples(physeq, Environment=="Copepod")
-sample_data(copepods_only)$green <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod South", TRUE, FALSE))
+sample_data(copepods_only)$green <- as.factor(ifelse(sample_data(copepods_only)$CladexHost == "Copepod Gulf", TRUE, FALSE))
 
 copdds <- phyloseq_to_deseq2(copepods_only, ~ green)
 geoMeans <- apply(counts(copdds), 1, gm_mean)
@@ -238,7 +241,7 @@ There are a few taxa that are overrepresented in green clade, and interestingly 
 #Are there taxa which are only/over-represented in Red clade samples?
 #Subset data for plotting purposes
 copepods_only <- subset_samples(physeq, Environment=="Copepod")
-sample_data(copepods_only)$purple <- as.factor(ifelse(sample_data(copepods_only)$RegionxHost == "Copepod Europe", TRUE, FALSE))
+sample_data(copepods_only)$purple <- as.factor(ifelse(sample_data(copepods_only)$CladexHost == "Copepod European", TRUE, FALSE))
 
 copdds <- phyloseq_to_deseq2(copepods_only, ~ purple)
 geoMeans <- apply(counts(copdds), 1, gm_mean)
