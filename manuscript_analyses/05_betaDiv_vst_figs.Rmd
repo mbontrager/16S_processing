@@ -281,9 +281,9 @@ plot_ordination(physeq, iMDS, color="Location") +
 
 theme_set(theme_bw(base_size = 22))
 #Plot Unifrac with hostxwater colors,
-png("UniFrac_unweighted_NMDS.png", width=800, height=600)
+pdf("UniFrac_unweighted_NMDS.pdf", width=6, height=4)
 plot_ordination(physeq, iMDS, color="HostxWater", shape="Environment") +
-    geom_point(size = 7) +
+    geom_point(size = 2.5) +
     scale_color_manual(values=c("lightpink2", "darkred", "lightblue", "darkblue")) +
     guides(shape=FALSE, color=FALSE)
     theme(axis.title.y = element_text(size=20),
