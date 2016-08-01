@@ -1,0 +1,56 @@
+Sample,Environment,WaterType,Salinity,Temperature,Location,Clade,Latitude,Longitude,Continent,Code
+AE,Control,NA,NA,NA,NA,NA,NA,,NA,
+BBE,Copepod,Salt,5.7,18.3,Blue Hammock Bayou,Gulf,29.174,-91.071,N America,BS-3C
+BBE1,Copepod,Salt,5.7,18.3,Blue Hammock Bayou,Gulf,29.174,-91.071,N America,BS-3C
+BBE2,Copepod,Salt,5.7,18.3,Blue Hammock Bayou,Gulf,29.174,-91.071,N America,BS-3C
+BBW,Water,Salt,5.7,18.3,Blue Hammock Bayou,Gulf,29.174,-91.071,N America,BS-3W
+BRE,Copepod,Fresh,0,29.7,Braddock Bay,Atlantic,43.307,-77.706,N America,AF-1C
+BRW,Water,Fresh,0,29.7,Braddock Bay,Atlantic,43.307,-77.706,N America,AF-1W
+CBE,Copepod,Salt,4.9,17,Cocodrie Bayou,Gulf,29.254,-90.664,N America,BS-2C
+CBG,Gut,Salt,4.9,17,Cocodrie Bayou,Gulf,29.254,-90.664,N America,
+CBW,Water,Salt,4.9,17,Cocodrie Bayou,Gulf,29.254,-90.664,N America,BS-2W
+CE,Copepod,Salt,4.9,17,Cocodrie Bayou,Gulf,29.254,-90.664,N America,
+EUE,Copepod,Fresh,0,10,Lake Eufaula,Gulf,35.146,-95.627,N America,BF-2C
+EUW,Water,Fresh,0,10,Lake Eufaula,Gulf,35.146,-95.627,N America,BF-2W
+FRE,Copepod,Fresh,0,13.4,Frisian Lake,European,53.031,5.729,Europe,CF-1C
+FRW,Water,Fresh,0,13.4,Frisian Lake,European,53.031,5.729,Europe,CF-1W
+IJE,Copepod,Fresh,0,13.1,Ijsselmeer,European,52.699,5.29,Europe,CF-2C
+IJW,Water,Fresh,0,13.1,Ijsselmeer,European,52.699,5.29,Europe,CF-2W
+LOE,Copepod,Fresh,0,22.8,Louisville,Gulf,38.26,-85.747,N America,BF-1C
+LOG,Gut,Fresh,0,22.8,Louisville,Gulf,38.26,-85.747,N America,
+LOGUN,Gut,Fresh,0,22.8,Louisville,Gulf,38.26,-85.747,N America,BF-1G
+LOW,Water,Fresh,0,22.8,Louisville,Gulf,38.26,-85.747,N America,BF-1W
+MAE,Copepod,Salt,5,NA,Montmagnay,Atlantic,46.99,-70.55,N America,AS-2C
+MAW,Water,Salt,5,5.1,Montmagnay,Atlantic,46.99,-70.55,N America,AS-2W
+MIE,Copepod,Fresh,0.1,15.7,Milwaukee,Atlantic,43.051,-87.882,N America,NA
+MIW,Water,Fresh,0,15.7,Milwaukee,Atlantic,43.051,-87.882,N America,NA
+MME,Copepod,Fresh,0,12.1,Markemeer,European,52.574,5.033,Europe,CF-3C
+MMW,Water,Fresh,0,12.1,Markemeer,European,52.574,5.033,Europe,CF-3W
+POE,Copepod,Salt,2,15.5,Lake Pontchartrain,Gulf,30.154,-89.762,N America,BS-1C
+POE1,Copepod,Salt,2,15.5,Lake Pontchartrain,Gulf,30.154,-89.762,N America,BS-1C
+POE2,Copepod,Salt,2,15.5,Lake Pontchartrain,Gulf,30.154,-89.762,N America,BS-1C
+POW,Water,Salt,2,15.5,Lake Pontchartrain,Gulf,30.154,-89.762,N America,BS-1W
+RAE,Copepod,Fresh,0,16.4,Racine,Atlantic,42.729,-87.779,N America,NA
+RME,Copepod,Fresh,0,16.4,Racine,Atlantic,42.729,-87.779,N America,AF-2C
+RAG,Gut,Fresh,0,15.1,Racine,Atlantic,42.729,-87.779,N America,NA
+RAW,Water,Fresh,0,16.4,Racine,Atlantic,42.729,-87.779,N America,NA
+RMW,Water,Fresh,0,16.4,Racine,Atlantic,42.729,-87.779,N America,AF-2W
+RE,Copepod,Fresh,0,15.1,Racine,Atlantic,42.729,-87.779,N America,
+SCE,Copepod,Salt,7,11.7,Western Scheldt,European,51.302,4.286,Europe,CS-1C
+SCW,Water,Salt,7,11.7,Western Scheldt,European,51.302,4.286,Europe,CS-1W
+SJE,Copepod,Salt,3.1,NA,St Jean,Atlantic,47.219,-70.281,N America,AS-3C
+TBE,Copepod,Salt,4,16,Taylor Bayou,Gulf,29.883,-94.051,N America,NA
+TBW,Water,Salt,4,16,Taylor Bayou,Gulf,29.883,-94.051,N America,NA
+TXE,Copepod,Fresh,0.9,13,Lake Texoma,Gulf,33.882,-96.797,N America,BF-3C
+TXW,Water,Fresh,0.9,13,Lake Texoma,Gulf,33.882,-96.797,N America,BF-3W
+VIE,Copepod,Salt,13.7,5.9,Lisle Verte,Atlantic,48.002,-69.423,N America,AS-1C
+V1Ep,Copepod,Salt,13.7,5.9,Lisle Verte1,Atlantic,48.002,-69.423,N America,
+VIW,Water,Salt,12.7,4.5,Lisle Verte,Atlantic,47.002,-70.423,N America,AS-1W
+V1W,Water,Salt,13.7,5.9,Lisle Verte,Atlantic,48.002,-69.423,N America,NA
+V1Wp,Water,Salt,13.7,5.9,Lisle Verte1,Atlantic,48.002,-69.423,N America,
+V2E,Copepod,Salt,13.7,6.5,Lisle Verte2,Atlantic,48.002,-69.423,N America,AS-4C
+V2W01,Water,Salt,13.7,6.5,Lisle Verte2,Atlantic,48.002,-69.423,N America,AS-4W
+VE,Copepod,Salt,13.7,4.5,Lisle Verte,Atlantic,48.002,-69.423,N America,AS-1C
+VG,Gut,Salt,13.7,4.5,Lisle Verte,Atlantic,48.002,-69.423,N America,AS-1G
+VGUN,Gut,Salt,13.7,4.5,Lisle Verte,Atlantic,48.002,-69.423,N America,
+W,Control,NA,NA,NA,NA,NA,NA,,NA,
