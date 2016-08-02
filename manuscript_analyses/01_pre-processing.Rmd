@@ -101,8 +101,8 @@ physeq <- prune_taxa(taxa_sums(physeq) > 1, physeq)
 # is performed during beta diversity analyses
 
 if (output_table){
-    #physeq1 <- transform_sample_counts(physeq, function(x) round(100 * (x/sum(x)), 2))
-    physeq1 <- physeq
+    physeq1 <- transform_sample_counts(physeq, function(x) round(100 * (x/sum(x)), 2))
+    #physeq1 <- physeq
     b <- psmelt(physeq1)[, 1:3]
     c <- dcast(b, OTU ~ Sample)
     e <- as.data.frame(tax_table(physeq))
@@ -112,7 +112,7 @@ if (output_table){
     d <- as.numeric(d)
     f$OTU <- sprintf("OTU_%05d", d)
     f <- f[order(f$OTU),]
-    write.csv(f, "output/sample_matrix_raw_counts.csv")
+    write.csv(f, "output/sample_matrix_relative.csv")
     rm(physeq1, b, c, d, e, f)
 }
 
