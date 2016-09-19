@@ -180,10 +180,10 @@ dev.off()
 ## Abundance by Class
 
 ```{r abundance_class}
-# I only look at the top 20 Classes
+# I only look at the top 9 Classes
 physeq_glom <- tax_glom(physeq, "Class")
 physeq_rel_glom <- transform_sample_counts(physeq_glom, function(x) x / sum(x))
-a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:10]), 
+a <- prune_taxa(names(sort(taxa_sums(physeq_rel_glom), decreasing = TRUE)[1:9]), 
                 physeq_rel_glom)
 colorCount <- length(levels(as.data.frame(tax_table(a))$Class))
 color_val <- sample(getPalette(colorCount))
@@ -195,12 +195,14 @@ wat <- subset_samples(a, Environment=="Water")
 #Plotting (to get the bar order consistent)
 pdf("figS-Abundance_class_copepods.pdf", height=6, width=9)
 comparison_plot(cop, color_val, label = "Code", fill = "Class") +
-    guides(fill=guide_legend(ncol=1)) 
+    guides(fill=guide_legend(ncol=1)) + facet_wrap(~Class) + 
+    theme(axis.text.x = element_text(angle = 90, hjust=0, vjust=0.5, size=11))
 dev.off()
 
 pdf("figS-Abundance_class_water.pdf", height=6, width=9)
 comparison_plot(wat, color_val, label = "Code", fill = "Class") +
-    guides(fill=guide_legend(ncol=1))
+    guides(fill=guide_legend(ncol=1)) + facet_wrap(~Class) + 
+    theme(axis.text.x = element_text(angle = 90, hjust=0, vjust=0.5, size=11))
 dev.off()
 ```
 

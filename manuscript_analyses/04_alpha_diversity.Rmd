@@ -184,7 +184,7 @@ Test whether diversity in water is affected by salinity
 adivWsalt <- filter(adivW, WaterType =="Salt")
 adivWfresh <- filter(adivW, WaterType == "Fresh")
 
-t.test(adivWsalt$Chao1, adivWfresh$Chao1, alternative="greater")
+t.test(adivWsalt$Chao1, adivWfresh$Chao1)
 ```
 
 ## Test copepod diversity by salinity
@@ -194,7 +194,7 @@ Test whether diversity in copepods is affected by salinity
 adivCsalt <- filter(adivC, WaterType == "Salt")
 adivCfresh <- filter(adivC, WaterType == "Fresh")
 
-t.test(adivCsalt$Chao1, adivCfresh$Chao1, alternative="greater")
+t.test(adivCsalt$Chao1, adivCfresh$Chao1)
 ```
 
 #Alpha Diversity Estimates by Salinity
@@ -217,7 +217,8 @@ p1 <- rplot_cop + geom_boxplot(data=rplot_cop$data, aes(x=WaterType, y=value, co
     theme(axis.title.y = element_blank(),
           axis.title.x = element_blank(),
           axis.text.x = element_blank(),
-          strip.text.x = element_text(size = 12))
+          strip.text.x = element_text(size = 12)) +
+    ylim(1.5, 5.5)
 p1
 
 t <- "Water bacteria samples"
@@ -230,7 +231,8 @@ p2 <- rplot_water + geom_boxplot(data=rplot_water$data, aes(x=WaterType, y=value
           axis.title.x = element_blank(),
           axis.text.x = element_blank(),
           strip.text.x = element_text(size = 12),
-          legend.text = element_text(size=10))
+          legend.text = element_text(size=10)) +
+    ylim(1.5, 5.5)
 
 p1 <- p1 + theme(legend.position="none")
 p2 <- p2 + theme(legend.position="none")
